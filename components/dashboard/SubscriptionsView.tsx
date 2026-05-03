@@ -407,6 +407,66 @@ export function SubscriptionsView() {
         </div>
       </section>
 
+      <section
+        className={`${styles.hero} ${pack.kpiCardPack} ${pack.kpiCardPackNeutral}`}
+      >
+        <div className={styles.heroTop}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
+            <div className={`${pack.iconPack} ${pack.iconPackNeutral} ${pack.iconPackSm}`}>
+              <Crown size={20} strokeWidth={1.75} aria-hidden />
+            </div>
+            <div>
+              <h2 className={styles.planName}>Adzz access</h2>
+              <p className={styles.planMeta}>
+                {active
+                  ? "Your current billing period on this account."
+                  : "Days left reflects your plan when you have an active subscription."}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.stats}>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Days left</span>
+            <p className={styles.statValue}>
+              {loading ? "…" : left.toLocaleString()}
+            </p>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Cycle length</span>
+            <p className={styles.statValue}>
+              {loading ? "…" : `${total.toLocaleString()} days`}
+            </p>
+          </div>
+          <div className={styles.stat}>
+            <span className={styles.statLabel}>Remaining</span>
+            <p className={styles.statValue}>{loading ? "…" : `${pct}%`}</p>
+          </div>
+        </div>
+
+        <div className={styles.progressWrap}>
+          <div
+            className={styles.progressTrack}
+            role="progressbar"
+            aria-valuenow={left}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-label={`${left} of ${total} days left`}
+          >
+            <div
+              className={styles.progressFill}
+              style={{ width: `${pct}%` } as CSSProperties}
+            />
+          </div>
+          <p className={styles.progressCaption}>
+            {loading
+              ? "Loading subscription window…"
+              : `${left.toLocaleString()} of ${total.toLocaleString()} days left in this period`}
+          </p>
+        </div>
+      </section>
+
       {active && hasStripeSubscription ? (
         <section className={styles.manageCard} aria-labelledby="manage-heading">
           <h2 id="manage-heading" className={styles.manageTitle}>
@@ -475,66 +535,6 @@ export function SubscriptionsView() {
           and billing portal are not available.
         </p>
       ) : null}
-
-      <section
-        className={`${styles.hero} ${pack.kpiCardPack} ${pack.kpiCardPackNeutral}`}
-      >
-        <div className={styles.heroTop}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.65rem" }}>
-            <div className={`${pack.iconPack} ${pack.iconPackNeutral} ${pack.iconPackSm}`}>
-              <Crown size={20} strokeWidth={1.75} aria-hidden />
-            </div>
-            <div>
-              <h2 className={styles.planName}>Adzz access</h2>
-              <p className={styles.planMeta}>
-                {active
-                  ? "Your current billing period on this account."
-                  : "Days left reflects your plan when you have an active subscription."}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className={styles.stats}>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Days left</span>
-            <p className={styles.statValue}>
-              {loading ? "…" : left.toLocaleString()}
-            </p>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Cycle length</span>
-            <p className={styles.statValue}>
-              {loading ? "…" : `${total.toLocaleString()} days`}
-            </p>
-          </div>
-          <div className={styles.stat}>
-            <span className={styles.statLabel}>Remaining</span>
-            <p className={styles.statValue}>{loading ? "…" : `${pct}%`}</p>
-          </div>
-        </div>
-
-        <div className={styles.progressWrap}>
-          <div
-            className={styles.progressTrack}
-            role="progressbar"
-            aria-valuenow={left}
-            aria-valuemin={0}
-            aria-valuemax={total}
-            aria-label={`${left} of ${total} days left`}
-          >
-            <div
-              className={styles.progressFill}
-              style={{ width: `${pct}%` } as CSSProperties}
-            />
-          </div>
-          <p className={styles.progressCaption}>
-            {loading
-              ? "Loading subscription window…"
-              : `${left.toLocaleString()} of ${total.toLocaleString()} days left in this period`}
-          </p>
-        </div>
-      </section>
     </div>
   );
 }
