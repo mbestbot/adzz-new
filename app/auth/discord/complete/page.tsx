@@ -46,6 +46,20 @@ export default function DiscordAuthCompletePage() {
     const nextRaw = params.get("next");
 
     if (err) {
+      if (err === "signup_rate_limited") {
+        const ra = params.get("retry_after");
+        const sec = ra != null ? Number(ra) : NaN;
+        setErrorText(
+          Number.isFinite(sec) && sec > 0
+            ? `Too many new accounts were started from this network recently. Try again in about ${Math.max(1, Math.ceil(sec / 60))} minute(s).`
+            : "Too many new accounts were started from this network recently. Try again in a few minutes."
+        );
+        setErrorExtras([
+          { href: "/auth/signup", label: "Email sign-up" },
+          { href: "/auth/login", label: "Sign in" },
+        ]);
+        return;
+      }
       setErrorText(ERROR_MESSAGES[err] ?? err.replace(/_/g, " "));
       setErrorExtras([{ href: "/settings", label: "Account settings" }]);
       return;

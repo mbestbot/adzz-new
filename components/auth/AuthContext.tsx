@@ -95,8 +95,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token?: string;
         user?: AuthUser;
         error?: string;
+        retryAfterSeconds?: number;
       };
-      if (!res.ok) throw new Error(data.error ?? "Sign up failed");
+      if (!res.ok) {
+        if (res.status === 429 && data.retryAfterSeconds != null) {
+          const mins = Math.max(1, Math.ceil(data.retryAfterSeconds / 60));
+          throw new Error(
+            data.error ??
+              `Too many sign-up attempts from this network. Try again in about ${mins} minute(s).`
+          );
+        }
+        throw new Error(data.error ?? "Sign up failed");
+      }
       if (!data.token || !data.user) throw new Error("Invalid response");
       setStoredToken(data.token, { remember });
       setUser(data.user);
