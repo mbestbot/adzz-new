@@ -1018,6 +1018,15 @@
   color: var(--dash-muted);
 }
 
+.priceNote {
+  width: 100%;
+  flex-basis: 100%;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--dash-muted-2);
+  margin-top: -0.1rem;
+}
+
 .launchTag {
   font-size: 0.7rem;
   font-weight: 700;

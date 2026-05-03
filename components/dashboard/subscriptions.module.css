@@ -288,6 +288,21 @@
   -webkit-text-fill-color: transparent;
 }
 
+.pricePeriod {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--dash-muted-2);
+}
+
+.priceNote {
+  width: 100%;
+  flex-basis: 100%;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--dash-muted-2);
+  margin-top: -0.15rem;
+}
+
 @supports not (background-clip: text) {
   .priceNow {
     background: none;
