@@ -235,6 +235,14 @@ function statusLabel(s: ChannelStatus) {
 
 type MetricId = "servers" | "active" | "paused" | "errors";
 
+type FetchBannerState =
+  | null
+  | {
+      title: string;
+      mode: "determinate" | "indeterminate";
+      percent?: number;
+    };
+
 function ChannelActionsMenu({
   channelName,
   onRemove,
@@ -384,6 +392,7 @@ export function ServersView() {
   const [fixModalOpen, setFixModalOpen] = useState(false);
   const [refreshingPfp, setRefreshingPfp] = useState(false);
   const [fullReloading, setFullReloading] = useState(false);
+  const [fetchBanner, setFetchBanner] = useState<FetchBannerState>(null);
   const [addChannelForGuildId, setAddChannelForGuildId] = useState<
     string | null
   >(null);
@@ -1221,26 +1230,50 @@ export function ServersView() {
 
   const onRefreshDiscord = async () => {
     if (!activeBotId) return;
-    const sync = await syncGuilds(activeBotId);
-    if (!sync.ok) {
-      window.alert(
-        sync.error ??
-          "Could not refresh from Discord. Is the backend running?"
-      );
-      return;
+    setFetchBanner({
+      title: "Syncing server & channel list with Discord…",
+      mode: "indeterminate",
+    });
+    try {
+      const sync = await syncGuilds(activeBotId);
+      if (!sync.ok) {
+        window.alert(
+          sync.error ??
+            "Could not refresh from Discord. Is the backend running?"
+        );
+        return;
+      }
+      setFetchBanner({
+        title: "Loading servers, campaign targets, and connection status…",
+        mode: "indeterminate",
+      });
+      await loadGuilds();
+      await fetchAdCampaign();
+      await fetchDiscordConnectionStatus();
+      await refreshServerUiLinks();
+    } finally {
+      setFetchBanner(null);
     }
-    await loadGuilds();
-    await fetchAdCampaign();
-    await fetchDiscordConnectionStatus();
-    await refreshServerUiLinks();
   };
 
   /** Sync guild/channel cache from Discord for every bot, then reload UI data. */
   const onReloadAllServersAndData = useCallback(async () => {
     if (!bots.length) return;
     setFullReloading(true);
+    const n = bots.length;
+    const errors: string[] = [];
     try {
-      for (const b of bots) {
+      for (let i = 0; i < bots.length; i++) {
+        const b = bots[i];
+        const label = b.displayName ?? b.username ?? "Bot";
+        setFetchBanner({
+          title: `Discord sync: ${label} (${i + 1} of ${n})`,
+          mode: "determinate",
+          percent: Math.min(
+            90,
+            Math.round(((i + 0.35) / Math.max(n, 1)) * 92)
+          ),
+        });
         const res = await apiFetch(`/api/bots/${b.id}/guilds/sync`, {
           method: "POST",
         });
@@ -1248,18 +1281,30 @@ export function ServersView() {
           const data = (await res.json().catch(() => ({}))) as {
             error?: string;
           };
-          window.alert(
-            data.error ??
-              `Could not sync servers for ${b.displayName ?? b.username} (${res.status}). Is the backend running?`
+          errors.push(
+            `${label}: ${data.error ?? `HTTP ${res.status}`}`
           );
-          return;
+          continue;
         }
       }
+      setFetchBanner({
+        title: "Refreshing server list, campaign, and links…",
+        mode: "indeterminate",
+      });
       await loadGuilds();
       await fetchAdCampaign();
       await fetchDiscordConnectionStatus();
       await refreshServerUiLinks();
+      if (errors.length) {
+        const ok = n - errors.length;
+        window.alert(
+          ok > 0
+            ? `${ok} of ${n} bot(s) synced successfully. These failed:\n\n${errors.join("\n\n")}`
+            : `Could not sync any bot:\n\n${errors.join("\n\n")}`
+        );
+      }
     } finally {
+      setFetchBanner(null);
       setFullReloading(false);
     }
   }, [
@@ -1485,6 +1530,32 @@ export function ServersView() {
           </button>
         </div>
       </div>
+
+      {fetchBanner ? (
+        <div
+          className={styles.syncFetchBanner}
+          role="status"
+          aria-live="polite"
+          aria-busy
+        >
+          <p className={styles.syncFetchBannerText}>{fetchBanner.title}</p>
+          <div
+            className={
+              fetchBanner.mode === "indeterminate"
+                ? styles.syncFetchTrackIndeterminate
+                : styles.syncFetchTrack
+            }
+            aria-hidden
+          >
+            {fetchBanner.mode === "determinate" ? (
+              <div
+                className={styles.syncFetchFill}
+                style={{ width: `${Math.max(4, fetchBanner.percent ?? 0)}%` }}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {activeBotId ? (
         <FixBotModal

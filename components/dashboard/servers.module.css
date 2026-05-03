@@ -240,7 +240,9 @@
 }
 
 .syncFetchTrackIndeterminate {
-  composes: syncFetchTrack;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
   background: linear-gradient(
     90deg,
     rgba(124, 58, 237, 0.12) 0%,

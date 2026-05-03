@@ -674,22 +674,9 @@ export function MessagesView() {
       }
       const data = (await res.json()) as { campaigns?: ApiCampaignRow[] };
       const b = botsRef.current;
-      let list = (data.campaigns ?? []).map((row) =>
+      const list = (data.campaigns ?? []).map((row) =>
         hydrateCampaignFromApi(row, b)
       );
-      if (list.length === 0) {
-        const cr = await apiFetch("/api/ad-campaign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        });
-        if (cr.ok) {
-          const j = (await cr.json()) as { campaign?: ApiCampaignRow };
-          if (j.campaign) {
-            list = [hydrateCampaignFromApi(j.campaign, b)];
-          }
-        }
-      }
       if (!cancelled) {
         setCampaigns(list);
         setPreviewCampaignId((p) => p ?? list[0]?.id ?? null);
@@ -852,20 +839,7 @@ export function MessagesView() {
       setGlobalError(data.error ?? `Delete failed (${res.status})`);
       return;
     }
-    let next = campaignsRef.current.filter((c) => c.id !== id);
-    if (next.length === 0) {
-      const cr = await apiFetch("/api/ad-campaign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      if (cr.ok) {
-        const j = (await cr.json()) as { campaign?: ApiCampaignRow };
-        if (j.campaign) {
-          next = [hydrateCampaignFromApi(j.campaign, botsRef.current)];
-        }
-      }
-    }
+    const next = campaignsRef.current.filter((c) => c.id !== id);
     setCampaigns(next);
     setPreviewCampaignId((p) => {
       if (p !== id) return p ?? next[0]?.id ?? null;
