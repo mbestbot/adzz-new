@@ -8,7 +8,8 @@ export default function AdminBotsPage() {
       <p className={shellStyles.mainLead}>
         All stored bots, which proxy host their Discord REST traffic is pinned to (when
         proxies are configured), and total ads sent across campaigns. The “i” panel
-        includes credentials — admin routes are unauthenticated; do not expose publicly.
+        includes credentials — keep admin access restricted; sign in at{" "}
+        <strong>/admin/login</strong>.
       </p>
       <BotsView />
     </>

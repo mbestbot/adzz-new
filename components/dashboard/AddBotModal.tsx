@@ -175,7 +175,7 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
   const simTzidRef = useRef<number | null>(null);
   const otpBannerRef = useRef<HTMLDivElement | null>(null);
 
-  type SimCountry = { dialCode: number; name: string; key: string };
+  type SimCountry = { dialCode: number; name: string; key: string; priceUsd?: number };
   const [simCountries, setSimCountries] = useState<SimCountry[]>([]);
   const [simCountriesLoading, setSimCountriesLoading] = useState(false);
   const [simMetaErr, setSimMetaErr] = useState<string | null>(null);
@@ -340,7 +340,9 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
         }
         const list = Array.isArray(data.countries) ? data.countries : [];
         setSimCountries(list);
-        setSelectedDial((prev) => prev ?? (list[0]?.dialCode ?? null));
+        const nlDial = 31;
+        const nl = list.find((c) => c.dialCode === nlDial);
+        setSelectedDial((prev) => prev ?? nl?.dialCode ?? list[0]?.dialCode ?? null);
       } catch {
         if (!cancelled) {
           setSimMetaErr("Could not connect. Check your connection and try again.");
@@ -444,22 +446,8 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
     return () => document.removeEventListener("mousedown", onDoc);
   }, [countryMenuOpen]);
 
-  /** United States (+1) and Indonesia (+62) first — common Discord SMS routes. */
-  const simCountriesDisplay = useMemo(() => {
-    const list = [...simCountries];
-    const preferDials = [1, 62];
-    const picked: SimCountry[] = [];
-    const used = new Set<number>();
-    for (const d of preferDials) {
-      const c = list.find((x) => x.dialCode === d);
-      if (c) {
-        picked.push(c);
-        used.add(d);
-      }
-    }
-    const rest = list.filter((c) => !used.has(c.dialCode));
-    return [...picked, ...rest];
-  }, [simCountries]);
+  /** List order comes from the API (Netherlands first, then A–Z). */
+  const simCountriesDisplay = useMemo(() => [...simCountries], [simCountries]);
 
   const selectedCountryLabel = useMemo(() => {
     const c = simCountries.find((x) => x.dialCode === selectedDial);
@@ -1282,38 +1270,24 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
                       {simSmsWaitTimedOut ? (
                         <div className={styles.otpStickyHint}>
                           <p className={styles.otpTimeoutMsg}>
-                            Still no code? Rent a new number below. Pick a
-                            different country if you like —{" "}
-                            <strong>United States (+1)</strong> and{" "}
-                            <strong>Indonesia (+62)</strong> are often reliable
-                            for Discord.
+                            Still no code? Rent a new number below.{" "}
+                            <strong>Netherlands (+31)</strong> is the default
+                            low-cost option for Discord — or pick another country
+                            from the menu.
                           </p>
                           <div className={styles.countrySuggestRow}>
                             <button
                               type="button"
                               className={styles.countrySuggestChip}
                               disabled={
-                                !simCountries.some((c) => c.dialCode === 1)
+                                !simCountries.some((c) => c.dialCode === 31)
                               }
                               onClick={() => {
-                                setSelectedDial(1);
+                                setSelectedDial(31);
                                 setCountryMenuOpen(false);
                               }}
                             >
-                              Use USA +1
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.countrySuggestChip}
-                              disabled={
-                                !simCountries.some((c) => c.dialCode === 62)
-                              }
-                              onClick={() => {
-                                setSelectedDial(62);
-                                setCountryMenuOpen(false);
-                              }}
-                            >
-                              Use Indonesia +62
+                              Use Netherlands +31
                             </button>
                           </div>
                           <button

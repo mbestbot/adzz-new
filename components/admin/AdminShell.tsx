@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
+import { clearAdminToken } from "@/lib/adminToken";
 import styles from "./adminShell.module.css";
 
 const LINKS = [
@@ -13,12 +14,30 @@ const LINKS = [
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  if (pathname === "/admin/login") {
+    return <>{children}</>;
+  }
 
   return (
     <div className={styles.page}>
       <header className={styles.topBar}>
         <span className={styles.brand}>Adzz Admin</span>
-        <span className={styles.badge}>No auth — testing only</span>
+        <div className={styles.topBarRight}>
+          <span className={styles.badge}>Authenticated</span>
+          <button
+            type="button"
+            className={styles.logoutBtn}
+            onClick={() => {
+              clearAdminToken();
+              router.push("/admin/login");
+              router.refresh();
+            }}
+          >
+            Log out
+          </button>
+        </div>
       </header>
       <div className={styles.body}>
         <aside className={styles.side}>

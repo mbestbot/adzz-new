@@ -1,4 +1,5 @@
 import { API_BASE } from "./api";
+import { getAdminToken } from "./adminToken";
 
 async function parseAdminResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
@@ -15,15 +16,22 @@ async function parseAdminResponse<T>(res: Response): Promise<T> {
   return data as T;
 }
 
+function adminAuthHeaders(): HeadersInit {
+  const t = getAdminToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
 export async function adminGetJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { ...adminAuthHeaders() },
+  });
   return parseAdminResponse<T>(res);
 }
 
 export async function adminPostJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify(body ?? {}),
   });
   return parseAdminResponse<T>(res);
@@ -32,13 +40,16 @@ export async function adminPostJson<T>(path: string, body: unknown): Promise<T> 
 export async function adminPatchJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify(body ?? {}),
   });
   return parseAdminResponse<T>(res);
 }
 
 export async function adminDeleteJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: { ...adminAuthHeaders() },
+  });
   return parseAdminResponse<T>(res);
 }
