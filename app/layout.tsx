@@ -15,7 +15,24 @@ export const metadata: Metadata = {
     default: "Adzz",
     template: "%s · Adzz",
   },
-  description: "Discord ad automation — adzz.pro",
+  description: "The Ultimate Ad Engine for Discord",
+  openGraph: {
+    title: "Adzz",
+    description: "The Ultimate Ad Engine for Discord",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        alt: "Adzz — The Ultimate Ad Engine for Discord",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Adzz",
+    description: "The Ultimate Ad Engine for Discord",
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {
