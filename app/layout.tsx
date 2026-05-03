@@ -39,7 +39,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#000104",
+  /** Discord / browsers use this for link-preview accent + PWA chrome tint */
+  themeColor: "#7c3aed",
 };
 
 export default function RootLayout({
