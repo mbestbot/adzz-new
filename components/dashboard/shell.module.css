@@ -1,0 +1,302 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--dash-bg);
+  color: var(--dash-text);
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  isolation: isolate;
+  background-color: var(--dash-bg);
+  background-image:
+    radial-gradient(
+      ellipse 110% 90% at 50% -35%,
+      rgba(192, 132, 252, 0.14),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 100% 0%,
+      rgba(124, 58, 237, 0.14),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 45% 40% at 0% 18%,
+      rgba(232, 121, 249, 0.1),
+      transparent 48%
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 50% 120%,
+      rgba(88, 28, 135, 0.12),
+      transparent 55%
+    );
+}
+
+.main::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  left: 248px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.06) 0%,
+    transparent 32%,
+    transparent 100%
+  );
+  z-index: 0;
+}
+
+.mainBody {
+  flex: 1 1 0%;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mainInner {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.mainInnerLocked {
+  filter: blur(7px);
+  opacity: 0.48;
+  pointer-events: none;
+  user-select: none;
+}
+
+.subscriptionLockOverlay {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: rgba(6, 4, 13, 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.subscriptionLockCard {
+  flex-shrink: 0;
+  max-width: 26rem;
+  width: min(100%, 26rem);
+  padding: 1.35rem 1.5rem;
+  border-radius: 16px;
+  border: 1px solid var(--dash-border-strong);
+  background: linear-gradient(
+    155deg,
+    rgba(88, 28, 135, 0.5) 0%,
+    var(--dash-surface) 100%
+  );
+  box-shadow: var(--dash-shadow-lg);
+  text-align: center;
+}
+
+.subscriptionLockTitle {
+  margin: 0 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--dash-text);
+}
+
+.subscriptionLockDesc {
+  margin: 0 0 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.55;
+  color: var(--dash-text-secondary);
+}
+
+.subscriptionLockActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.subscriptionLockCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1.1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--dash-text);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.85),
+    rgba(59, 130, 246, 0.55)
+  );
+  border: 1px solid rgba(167, 139, 250, 0.45);
+}
+
+.subscriptionLockCta:hover {
+  filter: brightness(1.08);
+}
+
+.subscriptionLockSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--dash-muted);
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2);
+}
+
+.subscriptionLockSecondary:hover {
+  color: var(--dash-text-secondary);
+}
+
+/* Viewport-locked to the main column so the modal stays centered even when
+   the dashboard route paints a very tall blurred layer (vh-based charts, etc.). */
+@media (min-width: 901px) {
+  .subscriptionLockOverlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 248px;
+    width: auto;
+    height: auto;
+  }
+}
+
+.mobileHeader {
+  display: none;
+}
+
+.sidebarBackdrop {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .main::before {
+    left: 0;
+  }
+
+  .sidebarBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 260;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    cursor: pointer;
+    background: rgba(6, 4, 13, 0.52);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .mobileHeader {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    padding: 0.55rem max(0.65rem, env(safe-area-inset-left))
+      0.55rem max(0.65rem, env(safe-area-inset-right));
+    padding-top: max(0.55rem, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--dash-border-strong);
+    background: linear-gradient(
+      180deg,
+      var(--dash-surface) 0%,
+      rgba(15, 10, 28, 0.92) 100%
+    );
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .mobileNavToggle {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--dash-border-strong);
+    border-radius: 12px;
+    background: var(--dash-surface-2);
+    color: var(--dash-text-secondary);
+    cursor: pointer;
+    transition:
+      background 0.15s ease,
+      border-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .mobileNavToggle:hover {
+    border-color: rgba(167, 139, 250, 0.45);
+    color: var(--dash-text);
+    background: var(--dash-accent-softer);
+  }
+
+  .mobileHeaderTitle {
+    font-size: 0.9375rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--dash-text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /*
+   * Same idea as desktop: lock the gate to the viewport. Absolute + inset:0
+   * inside mainBody breaks on /dashboard mobile (very tall vh-based layout);
+   * fixed fills the screen below the sticky header (header z-index stays above).
+   */
+  .subscriptionLockOverlay {
+    position: fixed;
+    top: calc(44px + 0.55rem + max(0.55rem, env(safe-area-inset-top, 0px)));
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: auto;
+    z-index: 22;
+    padding: 0.85rem max(1rem, env(safe-area-inset-right))
+      max(1.25rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  }
+
+  .subscriptionLockCard {
+    margin: 0 max(0.5rem, env(safe-area-inset-left)) 0
+      max(0.5rem, env(safe-area-inset-right));
+  }
+}

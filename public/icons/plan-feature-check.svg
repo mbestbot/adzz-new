@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="planChkStroke" x1="8" y1="10" x2="40" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e9d5ff" />
+      <stop offset="0.45" stop-color="#c084fc" />
+      <stop offset="1" stop-color="#7c3aed" />
+    </linearGradient>
+    <linearGradient id="planChkFill" x1="24" y1="8" x2="24" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(124, 58, 237, 0.45)" />
+      <stop offset="1" stop-color="rgba(46, 16, 101, 0.55)" />
+    </linearGradient>
+    <filter id="planChkGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="1.25" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="24" cy="24" r="18.5" stroke="url(#planChkStroke)" stroke-width="2.75" fill="url(#planChkFill)" filter="url(#planChkGlow)" />
+  <path
+    d="M15 24.5 21.2 30.5 33 17.5"
+    stroke="url(#planChkStroke)"
+    stroke-width="3.25"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#planChkGlow)"
+  />
+</svg>

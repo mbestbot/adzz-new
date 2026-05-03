@@ -1,0 +1,282 @@
+/**
+ * Shared ADREACH-style neon squircle icons + dark grain “pack” card shells.
+ */
+
+/* ---- Pack card surface (use with .kpiCard from dashboard-overview) ---- */
+.kpiCardPack {
+  border-radius: 14px;
+  background-color: #0c0a12;
+  background-image:
+    radial-gradient(
+      ellipse 95% 65% at 50% -35%,
+      var(--pack-accent-glow, rgba(168, 85, 247, 0.14)),
+      transparent 58%
+    ),
+    radial-gradient(
+      circle at 18% 88%,
+      rgba(255, 255, 255, 0.035) 0%,
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 82% 35%,
+      rgba(255, 255, 255, 0.025) 0%,
+      transparent 42%
+    ),
+    repeating-linear-gradient(
+      -14deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 255, 255, 0.014) 2px,
+      rgba(255, 255, 255, 0.014) 3px
+    ),
+    linear-gradient(168deg, #13101c 0%, #090712 100%);
+  border: 1px solid var(--pack-border, rgba(168, 85, 247, 0.24));
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    0 14px 40px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055),
+    0 0 52px var(--pack-ambient, rgba(168, 85, 247, 0.09));
+}
+
+.kpiCardPackPurple {
+  --pack-accent-glow: rgba(168, 85, 247, 0.17);
+  --pack-border: rgba(167, 139, 250, 0.34);
+  --pack-ambient: rgba(168, 85, 247, 0.12);
+}
+
+.kpiCardPackBlue {
+  --pack-accent-glow: rgba(56, 189, 248, 0.15);
+  --pack-border: rgba(56, 189, 248, 0.32);
+  --pack-ambient: rgba(56, 189, 248, 0.11);
+}
+
+.kpiCardPackGreen {
+  --pack-accent-glow: rgba(52, 211, 153, 0.14);
+  --pack-border: rgba(52, 211, 153, 0.3);
+  --pack-ambient: rgba(52, 211, 153, 0.1);
+}
+
+.kpiCardPackAmber {
+  --pack-accent-glow: rgba(251, 191, 36, 0.14);
+  --pack-border: rgba(251, 191, 36, 0.3);
+  --pack-ambient: rgba(251, 191, 36, 0.09);
+}
+
+.kpiCardPackPink {
+  --pack-accent-glow: rgba(244, 114, 182, 0.15);
+  --pack-border: rgba(244, 114, 182, 0.32);
+  --pack-ambient: rgba(244, 114, 182, 0.11);
+}
+
+.kpiCardPackOrange {
+  --pack-accent-glow: rgba(251, 146, 60, 0.16);
+  --pack-border: rgba(251, 146, 60, 0.32);
+  --pack-ambient: rgba(251, 146, 60, 0.11);
+}
+
+.kpiCardPackNeutral {
+  --pack-accent-glow: rgba(226, 232, 240, 0.11);
+  --pack-border: rgba(148, 163, 184, 0.3);
+  --pack-ambient: rgba(226, 232, 240, 0.07);
+}
+
+/* ---- Neon squircle icon frames ---- */
+.iconPack {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: linear-gradient(
+    158deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(0, 0, 0, 0.42) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.iconPack svg {
+  flex-shrink: 0;
+}
+
+.iconPackSm {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.iconPackLive {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+.iconPackXs {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
+.iconPackPurple {
+  border-color: rgba(167, 139, 250, 0.52);
+  color: #ddd6fe;
+  box-shadow:
+    0 0 22px rgba(139, 92, 246, 0.35),
+    inset 0 0 24px rgba(124, 58, 237, 0.12);
+}
+
+.iconPackPurple svg {
+  filter: drop-shadow(0 0 7px rgba(167, 139, 250, 0.75));
+}
+
+.iconPackBlue {
+  border-color: rgba(56, 189, 248, 0.52);
+  color: #7dd3fc;
+  box-shadow:
+    0 0 22px rgba(56, 189, 248, 0.32),
+    inset 0 0 24px rgba(56, 189, 248, 0.1);
+}
+
+.iconPackBlue svg {
+  filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.75));
+}
+
+.iconPackGreen {
+  border-color: rgba(52, 211, 153, 0.52);
+  color: #6ee7b7;
+  box-shadow:
+    0 0 22px rgba(52, 211, 153, 0.3),
+    inset 0 0 24px rgba(52, 211, 153, 0.1);
+}
+
+.iconPackGreen svg {
+  filter: drop-shadow(0 0 7px rgba(52, 211, 153, 0.75));
+}
+
+.iconPackAmber {
+  border-color: rgba(251, 191, 36, 0.52);
+  color: #fde68a;
+  box-shadow:
+    0 0 22px rgba(251, 191, 36, 0.3),
+    inset 0 0 24px rgba(251, 191, 36, 0.1);
+}
+
+.iconPackAmber svg {
+  filter: drop-shadow(0 0 7px rgba(251, 191, 36, 0.75));
+}
+
+.iconPackPink {
+  border-color: rgba(244, 114, 182, 0.52);
+  color: #fbcfe8;
+  box-shadow:
+    0 0 22px rgba(244, 114, 182, 0.32),
+    inset 0 0 24px rgba(244, 114, 182, 0.1);
+}
+
+.iconPackPink svg {
+  filter: drop-shadow(0 0 7px rgba(244, 114, 182, 0.75));
+}
+
+.iconPackOrange {
+  border-color: rgba(251, 146, 60, 0.52);
+  color: #fdba74;
+  box-shadow:
+    0 0 22px rgba(251, 146, 60, 0.32),
+    inset 0 0 24px rgba(251, 146, 60, 0.1);
+}
+
+.iconPackOrange svg {
+  filter: drop-shadow(0 0 7px rgba(251, 146, 60, 0.75));
+}
+
+.iconPackNeutral {
+  border-color: rgba(226, 232, 240, 0.38);
+  color: #f1f5f9;
+  box-shadow:
+    0 0 20px rgba(226, 232, 240, 0.22),
+    inset 0 0 24px rgba(255, 255, 255, 0.06);
+}
+
+.iconPackNeutral svg {
+  filter: drop-shadow(0 0 7px rgba(226, 232, 240, 0.5));
+}
+
+.iconPackMuted {
+  border-color: rgba(148, 163, 184, 0.35);
+  color: var(--dash-muted, #9d8db8);
+  box-shadow:
+    0 0 14px rgba(148, 163, 184, 0.15),
+    inset 0 0 16px rgba(255, 255, 255, 0.03);
+}
+
+.iconPackMuted svg {
+  filter: drop-shadow(0 0 4px rgba(148, 163, 184, 0.35));
+}
+
+/* Profile / bot avatar neon rings */
+.avatarRing {
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 14px;
+  background: linear-gradient(
+    135deg,
+    rgba(216, 180, 254, 0.95) 0%,
+    rgba(124, 58, 237, 0.65) 55%,
+    rgba(91, 33, 182, 0.85) 100%
+  );
+  box-shadow:
+    0 0 28px rgba(168, 85, 247, 0.42),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.avatarRingInner {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dash-surface-2, #161022);
+}
+
+.avatarRingPlaceholder {
+  background: linear-gradient(
+    135deg,
+    var(--dash-accent-fuchsia, #e879f9) 0%,
+    var(--dash-accent-deep, #7c3aed) 55%,
+    var(--dash-accent-mid, #a855f7) 100%
+  );
+  color: white;
+}
+
+.avatarRingBot {
+  padding: 2px;
+  border-radius: 11px;
+  background: linear-gradient(
+    135deg,
+    rgba(167, 139, 250, 0.85),
+    rgba(59, 130, 246, 0.45)
+  );
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.28);
+  flex-shrink: 0;
+}
+
+.avatarRingBotInner {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  overflow: hidden;
+  display: block;
+  line-height: 0;
+}
+
+.avatarRingBotInner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

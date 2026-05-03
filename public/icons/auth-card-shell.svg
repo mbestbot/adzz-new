@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 640" preserveAspectRatio="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="authFill" x1="200" y1="28" x2="200" y2="612" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14101f" />
+      <stop offset="0.45" stop-color="#0c0a12" />
+      <stop offset="1" stop-color="#050508" />
+    </linearGradient>
+    <linearGradient id="authStroke" x1="40" y1="40" x2="360" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c4b5fd" />
+      <stop offset="0.35" stop-color="#a78bfa" />
+      <stop offset="0.7" stop-color="#7c3aed" />
+      <stop offset="1" stop-color="#6366f1" />
+    </linearGradient>
+    <filter id="authGlow" x="-8%" y="-5%" width="116%" height="110%">
+      <feGaussianBlur stdDeviation="3.5" result="b" />
+      <feMerge>
+        <feMergeNode in="b" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect
+    x="5"
+    y="5"
+    width="390"
+    height="630"
+    rx="26"
+    ry="26"
+    fill="url(#authFill)"
+    stroke="url(#authStroke)"
+    stroke-width="2.5"
+    filter="url(#authGlow)"
+  />
+</svg>

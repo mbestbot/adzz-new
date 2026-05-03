@@ -1,0 +1,44 @@
+import { API_BASE } from "./api";
+
+async function parseAdminResponse<T>(res: Response): Promise<T> {
+  const text = await res.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error("Invalid JSON from admin API");
+  }
+  if (!res.ok) {
+    const err = (data as { error?: string })?.error ?? res.statusText;
+    throw new Error(err);
+  }
+  return data as T;
+}
+
+export async function adminGetJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`);
+  return parseAdminResponse<T>(res);
+}
+
+export async function adminPostJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  return parseAdminResponse<T>(res);
+}
+
+export async function adminPatchJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  return parseAdminResponse<T>(res);
+}
+
+export async function adminDeleteJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  return parseAdminResponse<T>(res);
+}

@@ -1,0 +1,89 @@
+:root {
+  /* App dashboard theme — aligned with Add bot modal (deep violet, neon edges) */
+  --dash-bg: #06040d;
+  --dash-bg-subtle: #0b0618;
+  --dash-surface: #0f081a;
+  --dash-surface-2: #151023;
+  --dash-surface-3: #1c1530;
+  --dash-surface-glass: rgba(18, 12, 32, 0.78);
+  --dash-border: rgba(168, 85, 247, 0.18);
+  --dash-border-strong: rgba(192, 132, 252, 0.34);
+  --dash-text: #faf5ff;
+  --dash-text-secondary: #ede9fe;
+  --dash-muted: #a898c4;
+  --dash-muted-2: #7a6b96;
+  /* Purple spectrum */
+  --dash-accent: #d8b4fe;
+  --dash-accent-hover: #e9d5ff;
+  --dash-accent-mid: #c084fc;
+  --dash-accent-deep: #7c3aed;
+  --dash-accent-fuchsia: #e879f9;
+  --dash-accent-soft: rgba(168, 85, 247, 0.2);
+  --dash-accent-softer: rgba(168, 85, 247, 0.1);
+  --dash-glow: rgba(168, 85, 247, 0.42);
+  --dash-glow-soft: rgba(192, 132, 252, 0.16);
+  --dash-ring: rgba(216, 180, 254, 0.55);
+  /* Status (harmonized with violet) */
+  --dash-green: #4ade80;
+  --dash-green-soft: rgba(74, 222, 128, 0.16);
+  --dash-red: #fb7185;
+  --dash-red-soft: rgba(251, 113, 133, 0.16);
+  --dash-amber: #fcd34d;
+  --dash-amber-soft: rgba(252, 211, 77, 0.14);
+  --dash-radius: 12px;
+  --dash-radius-sm: 10px;
+  --dash-shadow-sm:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(168, 85, 247, 0.06);
+  --dash-shadow-md:
+    0 6px 20px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(168, 85, 247, 0.12),
+    0 0 40px rgba(124, 58, 237, 0.08);
+  --dash-shadow-lg:
+    0 18px 56px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(168, 85, 247, 0.14),
+    0 0 100px rgba(124, 58, 237, 0.12);
+  --dash-blur: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family:
+    var(--font-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  /* Match marketing/auth full-bleed base; dashboard paints its own canvas */
+  background: #000104;
+  color: var(--dash-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--dash-accent-soft);
+  color: var(--dash-text);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--dash-ring);
+  outline-offset: 2px;
+}

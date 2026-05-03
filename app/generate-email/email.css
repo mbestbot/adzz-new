@@ -1,0 +1,106 @@
+.email-tool {
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 3rem 1.25rem;
+  min-height: 100vh;
+}
+
+.email-tool-back {
+  margin: 0 0 1.5rem;
+}
+
+.email-tool-back a {
+  color: var(--dash-accent);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.email-tool-back a:hover {
+  color: var(--dash-accent-hover);
+  text-decoration: underline;
+}
+
+.email-tool h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem;
+  color: var(--dash-text);
+}
+
+.email-tool-sub {
+  margin: 0 0 2rem;
+  color: var(--dash-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  font-weight: 500;
+}
+
+.email-tool-sub a {
+  color: var(--dash-accent);
+  font-weight: 600;
+}
+
+.email-tool button {
+  appearance: none;
+  border: none;
+  border-radius: var(--dash-radius-sm);
+  padding: 0.7rem 1.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #faf5ff;
+  background: linear-gradient(
+    135deg,
+    var(--dash-accent-deep) 0%,
+    var(--dash-accent-mid) 50%,
+    var(--dash-accent-fuchsia) 100%
+  );
+  box-shadow:
+    0 4px 16px var(--dash-glow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    filter 0.15s ease;
+}
+
+.email-tool button:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow:
+    0 6px 24px var(--dash-glow-soft),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.email-tool button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.email-tool button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.email-tool-result {
+  margin-top: 1.75rem;
+  padding: 1rem 1.15rem;
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border-strong);
+  box-shadow: var(--dash-shadow-md);
+  word-break: break-all;
+  font-size: 1.05rem;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  color: var(--dash-text-secondary);
+}
+
+.email-tool-error {
+  margin-top: 1.75rem;
+  color: var(--dash-red);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  font-weight: 500;
+}
