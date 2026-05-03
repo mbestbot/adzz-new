@@ -43,18 +43,7 @@ export function SubscriptionsView() {
     "success" | "canceled" | null
   >(null);
   const [checkoutBusy, setCheckoutBusy] = useState<CheckoutPlan | null>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const p = new URLSearchParams(window.location.search);
-    const c = p.get("checkout");
-    if (c === "success") setCheckoutNotice("success");
-    else if (c === "canceled") setCheckoutNotice("canceled");
-  }, []);
-
-  useEffect(() => {
-    if (checkoutNotice === "success") void refreshSubscription();
-  }, [checkoutNotice, refreshSubscription]);
+  const [syncHint, setSyncHint] = useState<string | null>(null);
 
   const startCheckout = useCallback(async (plan: CheckoutPlan) => {
     setCheckoutBusy(plan);
@@ -109,6 +98,51 @@ export function SubscriptionsView() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = new URLSearchParams(window.location.search);
+    const checkout = p.get("checkout");
+    const sessionId = p.get("session_id");
+
+    if (checkout === "canceled") {
+      setCheckoutNotice("canceled");
+      return;
+    }
+    if (checkout !== "success") return;
+
+    setCheckoutNotice("success");
+    setSyncHint(null);
+
+    void (async () => {
+      if (sessionId) {
+        const res = await apiFetch("/api/stripe/sync-checkout-session", {
+          method: "POST",
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          setSyncHint(
+            body.error ??
+              "Could not confirm your subscription with the server. Try Refresh, or ensure Stripe webhooks reach your API for renewals."
+          );
+        }
+      }
+      await refreshSubscription();
+      await load();
+      const url = new URL(window.location.href);
+      url.searchParams.delete("checkout");
+      url.searchParams.delete("session_id");
+      const qs = url.searchParams.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${url.pathname}${qs ? `?${qs}` : ""}`
+      );
+    })();
+  }, [refreshSubscription, load]);
+
   const left = data?.subscriptionDaysLeft ?? 0;
   const total = data?.subscriptionDaysTotal ?? 28;
   const pct =
@@ -130,8 +164,8 @@ export function SubscriptionsView() {
           <h1 className={styles.title}>Subscriptions</h1>
           <p className={styles.lead}>
             Subscribe with Stripe (test mode). Launch pricing is billed monthly.
-            Your remaining trial-style window still appears below from server
-            config until you wire billing to subscription status.
+            After checkout, your plan updates here automatically; Stripe webhooks
+            on your API URL still handle renewals and cancellations.
           </p>
         </div>
         <button
@@ -151,6 +185,11 @@ export function SubscriptionsView() {
         <p className={styles.checkoutBannerOk} role="status">
           Checkout completed in Stripe. Test subscriptions appear in the Stripe
           Dashboard under Customers / Subscriptions.
+        </p>
+      ) : null}
+      {syncHint ? (
+        <p className={styles.checkoutBannerMuted} role="status">
+          {syncHint}
         </p>
       ) : null}
       {checkoutNotice === "canceled" ? (
