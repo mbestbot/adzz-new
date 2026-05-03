@@ -34,8 +34,14 @@ const BUSINESS_HIGHLIGHT_FEATURES = [
 ] as const;
 
 export function SubscriptionsView() {
-  const { refresh: refreshSubscription, tier, active, loading: subscriptionLoading } =
-    useSubscription();
+  const {
+    refresh: refreshSubscription,
+    tier,
+    active,
+    loading: subscriptionLoading,
+    cancelAtPeriodEnd,
+    hasStripeSubscription,
+  } = useSubscription();
   const [data, setData] = useState<DashboardSub | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +50,9 @@ export function SubscriptionsView() {
   >(null);
   const [checkoutBusy, setCheckoutBusy] = useState<CheckoutPlan | null>(null);
   const [syncHint, setSyncHint] = useState<string | null>(null);
+  const [manageBusy, setManageBusy] = useState<
+    null | "portal" | "cancel_end" | "cancel_now" | "resume"
+  >(null);
 
   const startCheckout = useCallback(async (plan: CheckoutPlan) => {
     setCheckoutBusy(plan);
@@ -93,6 +102,99 @@ export function SubscriptionsView() {
     });
     setLoading(false);
   }, []);
+
+  const openBillingPortal = useCallback(async () => {
+    setManageBusy("portal");
+    try {
+      const res = await apiFetch("/api/stripe/billing-portal", {
+        method: "POST",
+        body: "{}",
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        url?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(j.error ?? `Could not open billing portal (${res.status})`);
+        return;
+      }
+      if (j.url) window.location.href = j.url;
+      else window.alert("Billing portal did not return a URL.");
+    } finally {
+      setManageBusy(null);
+    }
+  }, []);
+
+  const cancelAtPeriodEndAction = useCallback(async () => {
+    if (
+      !window.confirm(
+        "Turn off renewal? You keep full access until the end of the current billing period."
+      )
+    ) {
+      return;
+    }
+    setManageBusy("cancel_end");
+    try {
+      const res = await apiFetch("/api/stripe/cancel-subscription", {
+        method: "POST",
+        body: JSON.stringify({ when: "period_end" }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        window.alert(j.error ?? "Could not update subscription.");
+        return;
+      }
+      await refreshSubscription();
+      await load();
+    } finally {
+      setManageBusy(null);
+    }
+  }, [refreshSubscription, load]);
+
+  const cancelImmediately = useCallback(async () => {
+    if (
+      !window.confirm(
+        "Cancel immediately? Paid access ends right away and cannot be undone from here."
+      )
+    ) {
+      return;
+    }
+    setManageBusy("cancel_now");
+    try {
+      const res = await apiFetch("/api/stripe/cancel-subscription", {
+        method: "POST",
+        body: JSON.stringify({ when: "immediate" }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        window.alert(j.error ?? "Could not cancel subscription.");
+        return;
+      }
+      await refreshSubscription();
+      await load();
+    } finally {
+      setManageBusy(null);
+    }
+  }, [refreshSubscription, load]);
+
+  const resumeRenewal = useCallback(async () => {
+    setManageBusy("resume");
+    try {
+      const res = await apiFetch("/api/stripe/resume-subscription", {
+        method: "POST",
+        body: "{}",
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        window.alert(j.error ?? "Could not resume subscription.");
+        return;
+      }
+      await refreshSubscription();
+      await load();
+    } finally {
+      setManageBusy(null);
+    }
+  }, [refreshSubscription, load]);
 
   useEffect(() => {
     void load();
@@ -163,9 +265,9 @@ export function SubscriptionsView() {
           </p>
           <h1 className={styles.title}>Subscriptions</h1>
           <p className={styles.lead}>
-            Subscribe with Stripe (test mode). Launch pricing is billed monthly.
-            After checkout, your plan updates here automatically; Stripe webhooks
-            on your API URL still handle renewals and cancellations.
+            Pro and Business are billed monthly through Stripe. Use{" "}
+            <strong>Manage subscription</strong> below to open billing, cancel
+            renewal, or end access immediately.
           </p>
         </div>
         <button
@@ -173,7 +275,10 @@ export function SubscriptionsView() {
           className={styles.refresh}
           onClick={() => {
             setLoading(true);
-            void load();
+            void (async () => {
+              await refreshSubscription();
+              await load();
+            })();
           }}
           disabled={loading}
         >
@@ -302,6 +407,75 @@ export function SubscriptionsView() {
         </div>
       </section>
 
+      {active && hasStripeSubscription ? (
+        <section className={styles.manageCard} aria-labelledby="manage-heading">
+          <h2 id="manage-heading" className={styles.manageTitle}>
+            Manage subscription
+          </h2>
+          <p className={styles.manageLead}>
+            Billing portal opens Stripe in a new flow (invoices, payment method).
+            Cancel at period end keeps access until the current cycle ends; cancel
+            immediately removes paid access right away.
+          </p>
+          {cancelAtPeriodEnd ? (
+            <p className={styles.manageWarn} role="status">
+              Renewal is off—you still have access until this billing period ends.
+            </p>
+          ) : null}
+          <div className={styles.manageActions}>
+            <button
+              type="button"
+              className={`${styles.manageBtn} ${styles.manageBtnPrimary}`}
+              disabled={manageBusy !== null}
+              onClick={() => void openBillingPortal()}
+            >
+              {manageBusy === "portal" ? "Opening…" : "Open billing portal"}
+            </button>
+            {cancelAtPeriodEnd ? (
+              <button
+                type="button"
+                className={styles.manageBtn}
+                disabled={manageBusy !== null}
+                onClick={() => void resumeRenewal()}
+              >
+                {manageBusy === "resume" ? "Saving…" : "Resume renewal"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.manageBtn}
+                disabled={manageBusy !== null}
+                onClick={() => void cancelAtPeriodEndAction()}
+              >
+                {manageBusy === "cancel_end"
+                  ? "Updating…"
+                  : "Cancel renewal (end of period)"}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`${styles.manageBtn} ${styles.manageBtnDanger}`}
+              disabled={manageBusy !== null}
+              onClick={() => void cancelImmediately()}
+            >
+              {manageBusy === "cancel_now" ? "Canceling…" : "Cancel immediately"}
+            </button>
+          </div>
+          <p className={styles.manageHint}>
+            Password and security:{" "}
+            <Link href="/settings" className={styles.linkInline}>
+              Account settings
+            </Link>
+            .
+          </p>
+        </section>
+      ) : active && !hasStripeSubscription ? (
+        <p className={styles.legacyStripeHint}>
+          This plan is not linked to Stripe on this account, so self-serve cancel
+          and billing portal are not available.
+        </p>
+      ) : null}
+
       <section
         className={`${styles.hero} ${pack.kpiCardPack} ${pack.kpiCardPackNeutral}`}
       >
@@ -313,7 +487,9 @@ export function SubscriptionsView() {
             <div>
               <h2 className={styles.planName}>Adzz access</h2>
               <p className={styles.planMeta}>
-                Configured billing window · renew when days left reaches zero
+                {active
+                  ? "Your current billing period on this account."
+                  : "Days left reflects your plan when you have an active subscription."}
               </p>
             </div>
           </div>
@@ -359,25 +535,6 @@ export function SubscriptionsView() {
           </p>
         </div>
       </section>
-
-      <p className={styles.note}>
-        <strong>Stripe.</strong> Configure{" "}
-        <code style={{ fontSize: "0.8em" }}>STRIPE_SECRET_KEY</code> and{" "}
-        <code style={{ fontSize: "0.8em" }}>FRONTEND_ORIGIN</code> on the API
-        host (see <code style={{ fontSize: "0.8em" }}>backend/.env.example</code>
-        ). Optional <code style={{ fontSize: "0.8em" }}>STRIPE_WEBHOOK_SECRET</code>{" "}
-        for subscription events. Frontend:{" "}
-        <code style={{ fontSize: "0.8em" }}>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>{" "}
-        in <code style={{ fontSize: "0.8em" }}>.env.local</code> for future
-        client-side Stripe.js (Checkout redirect works without it). Other env:{" "}
-        <code style={{ fontSize: "0.8em" }}>SUBSCRIPTION_DAYS_LEFT</code> /{" "}
-        <code style={{ fontSize: "0.8em" }}>SUBSCRIPTION_DAYS_TOTAL</code>. Update
-        security on{" "}
-        <Link href="/settings" className={styles.linkInline}>
-          Account settings
-        </Link>
-        .
-      </p>
     </div>
   );
 }

@@ -19,6 +19,8 @@ type SubCtx = {
   active: boolean;
   subscriptionDaysLeft: number;
   subscriptionDaysTotal: number;
+  cancelAtPeriodEnd: boolean;
+  hasStripeSubscription: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
 };
@@ -31,6 +33,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
   const [daysLeft, setDaysLeft] = useState(0);
   const [daysTotal, setDaysTotal] = useState(30);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [hasStripeSubscription, setHasStripeSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -38,6 +42,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setTier("none");
       setActive(false);
       setDaysLeft(0);
+      setCancelAtPeriodEnd(false);
+      setHasStripeSubscription(false);
       setLoading(false);
       return;
     }
@@ -46,6 +52,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       setTier("none");
       setActive(false);
       setDaysLeft(0);
+      setCancelAtPeriodEnd(false);
+      setHasStripeSubscription(false);
       setLoading(false);
       return;
     }
@@ -54,6 +62,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       active?: boolean;
       subscriptionDaysLeft?: number;
       subscriptionDaysTotal?: number;
+      cancelAtPeriodEnd?: boolean;
+      hasStripeSubscription?: boolean;
     };
     const t = String(j.tier ?? "").toLowerCase();
     setTier(
@@ -64,6 +74,8 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     setDaysTotal(
       Math.max(1, Math.floor(Number(j.subscriptionDaysTotal) || 30))
     );
+    setCancelAtPeriodEnd(Boolean(j.cancelAtPeriodEnd));
+    setHasStripeSubscription(Boolean(j.hasStripeSubscription));
     setLoading(false);
   }, [user?.id]);
 
@@ -91,10 +103,21 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       active,
       subscriptionDaysLeft: daysLeft,
       subscriptionDaysTotal: daysTotal,
+      cancelAtPeriodEnd,
+      hasStripeSubscription,
       loading,
       refresh,
     }),
-    [tier, active, daysLeft, daysTotal, loading, refresh]
+    [
+      tier,
+      active,
+      daysLeft,
+      daysTotal,
+      cancelAtPeriodEnd,
+      hasStripeSubscription,
+      loading,
+      refresh,
+    ]
   );
 
   return (
