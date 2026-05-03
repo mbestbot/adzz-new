@@ -203,6 +203,65 @@
   gap: 0.55rem;
 }
 
+.syncFetchBanner {
+  margin: -0.15rem 0 1.15rem;
+  padding: 0.65rem 0.9rem 0.72rem;
+  border-radius: var(--dash-radius-sm);
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2);
+  box-shadow: var(--dash-shadow-sm);
+}
+
+.syncFetchBannerText {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--dash-text-secondary);
+  line-height: 1.35;
+}
+
+.syncFetchTrack {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.12);
+  overflow: hidden;
+}
+
+.syncFetchFill {
+  height: 100%;
+  border-radius: 999px;
+  min-width: 4%;
+  background: linear-gradient(
+    90deg,
+    var(--dash-accent-deep) 0%,
+    var(--dash-accent-mid) 100%
+  );
+  transition: width 0.28s ease;
+}
+
+.syncFetchTrackIndeterminate {
+  composes: syncFetchTrack;
+  background: linear-gradient(
+    90deg,
+    rgba(124, 58, 237, 0.12) 0%,
+    rgba(167, 139, 250, 0.55) 45%,
+    rgba(192, 132, 252, 0.75) 50%,
+    rgba(167, 139, 250, 0.55) 55%,
+    rgba(124, 58, 237, 0.12) 100%
+  );
+  background-size: 200% 100%;
+  animation: syncFetchShimmer 1.15s linear infinite;
+}
+
+@keyframes syncFetchShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .botStatusCluster {
   display: inline-flex;
   align-items: center;

@@ -60,3 +60,103 @@
   color: #fecaca;
   font-size: 0.88rem;
 }
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+}
+
+.toolBtn {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(124, 58, 237, 0.45);
+  background: rgba(124, 58, 237, 0.18);
+  color: var(--dash-text);
+  cursor: pointer;
+}
+
+.toolBtn:hover {
+  background: rgba(124, 58, 237, 0.28);
+}
+
+.toolBtnGhost {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--dash-border-strong);
+  background: transparent;
+  color: var(--dash-muted);
+  cursor: pointer;
+}
+
+.toolBtnGhost:hover {
+  color: var(--dash-text);
+  border-color: var(--dash-muted);
+}
+
+.hint {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--dash-muted);
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.modal {
+  width: min(100%, 26rem);
+  padding: 1.25rem 1.35rem;
+  border-radius: 14px;
+  border: 1px solid var(--dash-border-strong);
+  background: var(--dash-surface);
+  box-shadow: var(--dash-shadow-md);
+}
+
+.modalTitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--dash-text);
+}
+
+.modalLead {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--dash-muted);
+}
+
+.modalTextarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 0.85rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--dash-border-strong);
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  resize: vertical;
+  min-height: 8rem;
+  background: var(--dash-bg);
+  color: var(--dash-text);
+}
+
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}

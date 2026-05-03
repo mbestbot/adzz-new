@@ -31,6 +31,20 @@ export function setStoredToken(
   }
 }
 
+const NETWORK_RETRY_ATTEMPTS = 3;
+const NETWORK_RETRY_BASE_MS = 350;
+
+function isLocalApiBase(): boolean {
+  return /localhost|127\.0\.0\.1/i.test(API_BASE);
+}
+
+function networkFailureHint(path: string): string {
+  if (isLocalApiBase()) {
+    return `Cannot reach Adzz API at ${API_BASE}. Start the backend (from the repo: cd backend && npm run dev). Request: ${path}`;
+  }
+  return `Network error contacting ${API_BASE}. Check your connection and try again. Request: ${path}`;
+}
+
 export async function apiFetch(path: string, init: RequestInit = {}) {
   const token = getStoredToken();
   const headers = new Headers(init.headers);
@@ -39,20 +53,30 @@ export async function apiFetch(path: string, init: RequestInit = {}) {
   }
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const url = `${API_BASE}${path}`;
-  try {
-    return await fetch(url, {
-      ...init,
-      headers,
-      credentials: init.credentials ?? "include",
-    });
-  } catch (e) {
-    const hint = `Cannot reach Adzz API at ${API_BASE}. Start the backend (from the repo: cd backend && npm run dev). Request: ${path}`;
-    console.error(hint, e);
-    return new Response(JSON.stringify({ error: hint }), {
-      status: 503,
-      headers: { "Content-Type": "application/json" },
-    });
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= NETWORK_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await fetch(url, {
+        ...init,
+        headers,
+        credentials: init.credentials ?? "include",
+      });
+    } catch (e) {
+      lastErr = e;
+      if (attempt < NETWORK_RETRY_ATTEMPTS) {
+        await new Promise((r) =>
+          setTimeout(r, NETWORK_RETRY_BASE_MS * attempt)
+        );
+        continue;
+      }
+    }
   }
+  const hint = networkFailureHint(path);
+  console.error(hint, lastErr);
+  return new Response(JSON.stringify({ error: hint }), {
+    status: 503,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 /** Unauthenticated JSON POST (login, signup, password reset). */

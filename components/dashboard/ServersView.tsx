@@ -12,12 +12,22 @@ import {
   RefreshCw,
   Search,
   Wrench,
+  Wand2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { readLegacyLinkedChannelsMinimal } from "@/lib/linkedChannelsStorage";
 import { UserProfileChip } from "./UserProfileChip";
 import { useBots } from "./BotContext";
-import { AddChannelModal } from "./AddChannelModal";
+import {
+  AddChannelModal,
+  channelNameMatchesAdvertisingFocus,
+  channelNameMatchesAdKeywords,
+  channelNameMatchesSellingFocus,
+} from "./AddChannelModal";
+import {
+  AutoConfigureChannelsModal,
+  type AutoConfigureMode,
+} from "./AutoConfigureChannelsModal";
 import { FixBotModal } from "./FixBotModal";
 import styles from "./servers.module.css";
 
@@ -377,6 +387,8 @@ export function ServersView() {
   const [addChannelForGuildId, setAddChannelForGuildId] = useState<
     string | null
   >(null);
+  const [autoConfigureOpen, setAutoConfigureOpen] = useState(false);
+  const [autoConfigureApplying, setAutoConfigureApplying] = useState(false);
   const [linkedByGuild, setLinkedByGuild] = useState<Record<string, ChannelRow[]>>(
     {}
   );
@@ -1073,6 +1085,68 @@ export function ServersView() {
     [activeBotId, saveServerUiLinks]
   );
 
+  const applyAutoConfigure = useCallback(
+    async (mode: AutoConfigureMode) => {
+      if (!activeBotId || !rawGuilds.length) return;
+      const matcher =
+        mode === "advertising"
+          ? channelNameMatchesAdvertisingFocus
+          : mode === "selling"
+            ? channelNameMatchesSellingFocus
+            : channelNameMatchesAdKeywords;
+      setAutoConfigureApplying(true);
+      try {
+        const merged: Record<string, ChannelRow[]> = {};
+        for (const [gid, rows] of Object.entries(linkedByGuild)) {
+          merged[gid] = [...rows];
+        }
+        let added = 0;
+        for (const g of rawGuilds) {
+          const existing = merged[g.id] ?? [];
+          const idSet = new Set(existing.map((c) => c.id));
+          const extra: ChannelRow[] = [];
+          for (const c of g.channels ?? []) {
+            if (c.type !== 0) continue;
+            if (idSet.has(c.id)) continue;
+            if (!matcher(c.name)) continue;
+            idSet.add(c.id);
+            extra.push({
+              id: c.id,
+              name: c.name,
+              status: "inactive",
+              interval: "—",
+              slowDown: "—",
+              lastSent: "—",
+              lastRun: "—",
+              messagesSent: "—",
+            });
+            added++;
+          }
+          if (extra.length) merged[g.id] = [...existing, ...extra];
+        }
+        if (added === 0) {
+          window.alert(
+            "No new channels matched this mode. Try Refresh from Discord first, or pick a different category."
+          );
+          return;
+        }
+        setLinkedByGuild(merged);
+        const r = await saveServerUiLinks(
+          activeBotId,
+          toMinimalGuildChannels(merged)
+        );
+        if (!r.ok) {
+          window.alert(r.error ?? "Could not save linked channels.");
+          return;
+        }
+        setAutoConfigureOpen(false);
+      } finally {
+        setAutoConfigureApplying(false);
+      }
+    },
+    [activeBotId, linkedByGuild, rawGuilds, saveServerUiLinks]
+  );
+
   const toggleChannelPause = useCallback(
     async (channelId: string, currentlyPaused: boolean) => {
       if (!activeBotId) return;
@@ -1389,6 +1463,22 @@ export function ServersView() {
             <RefreshCw size={16} strokeWidth={2} />
             {syncing ? "Syncing Discord…" : "Refresh from Discord"}
           </button>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            onClick={() => setAutoConfigureOpen(true)}
+            disabled={
+              syncing ||
+              fullReloading ||
+              !activeBotId ||
+              !rawGuilds.length ||
+              autoConfigureApplying
+            }
+            title="Add linked text channels on every server in cache using name rules (advertising, selling, or full keyword list)."
+          >
+            <Wand2 size={16} strokeWidth={2} />
+            Auto configure
+          </button>
           <button type="button" className={styles.btnSecondary}>
             <Download size={16} strokeWidth={2} />
             Export
@@ -1405,6 +1495,15 @@ export function ServersView() {
           onFixed={onFixBotComplete}
         />
       ) : null}
+
+      <AutoConfigureChannelsModal
+        open={autoConfigureOpen}
+        onClose={() => {
+          if (!autoConfigureApplying) setAutoConfigureOpen(false);
+        }}
+        applying={autoConfigureApplying}
+        onApply={(mode) => applyAutoConfigure(mode)}
+      />
 
       {addChannelForGuildId ? (
         <AddChannelModal

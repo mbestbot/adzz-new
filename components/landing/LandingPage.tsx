@@ -343,9 +343,10 @@ export function LandingPage() {
             <article className={styles.planCard}>
               <h3 className={styles.planName}>Adzz Pro</h3>
               <div className={styles.priceRow}>
-                <span className={styles.priceNow}>$0.50</span>
+                <span className={styles.priceWas}>$11.99</span>
+                <span className={styles.priceNow}>$6.99</span>
                 <span className={styles.pricePeriod}>/ month</span>
-                <span className={styles.priceNote}>Stripe USD minimum</span>
+                <span className={styles.launchTag}>Launch offer</span>
               </div>
               <p className={styles.planLead}>
                 Full access to bots, servers, analytics, ad pool, campaigns, and
@@ -370,9 +371,10 @@ export function LandingPage() {
               <span className={styles.planBadge}>Most flexible</span>
               <h3 className={styles.planName}>Adzz Business</h3>
               <div className={styles.priceRow}>
-                <span className={styles.priceNow}>$0.50</span>
+                <span className={styles.priceWas}>$18.99</span>
+                <span className={styles.priceNow}>$12.99</span>
                 <span className={styles.pricePeriod}>/ month</span>
-                <span className={styles.priceNote}>Stripe USD minimum</span>
+                <span className={styles.launchTag}>Launch offer</span>
               </div>
               <p className={styles.planLead}>
                 Everything in Pro, plus advanced campaign targeting and automatic

@@ -319,9 +319,9 @@ export function SubscriptionsView() {
             <div className={styles.planCardHead}>
               <h3 className={styles.planCardName}>Adzz Pro</h3>
               <div className={styles.priceBlock}>
-                <span className={styles.priceNow}>$0.50</span>
-                <span className={styles.pricePeriod}>/ month</span>
-                <span className={styles.priceNote}>Stripe USD minimum</span>
+                <span className={styles.priceWas}>$11.99</span>
+                <span className={styles.priceNow}>$6.99</span>
+                <span className={styles.launchTag}>Launch offer</span>
               </div>
               <p className={styles.whatsIncluded}>What&apos;s included</p>
               <ul className={styles.featureList}>
@@ -360,9 +360,9 @@ export function SubscriptionsView() {
             <div className={styles.planCardHead}>
               <h3 className={styles.planCardName}>Adzz Business</h3>
               <div className={styles.priceBlock}>
-                <span className={styles.priceNow}>$0.50</span>
-                <span className={styles.pricePeriod}>/ month</span>
-                <span className={styles.priceNote}>Stripe USD minimum</span>
+                <span className={styles.priceWas}>$18.99</span>
+                <span className={styles.priceNow}>$12.99</span>
+                <span className={styles.launchTag}>Launch offer</span>
               </div>
               <p className={styles.whatsIncluded}>What&apos;s included</p>
               <ul className={styles.featureList}>

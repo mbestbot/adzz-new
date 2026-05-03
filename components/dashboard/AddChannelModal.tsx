@@ -16,6 +16,21 @@ const NAME_KEYWORDS = [
   "seller",
 ] as const;
 
+/** Ad-style channels: advertisement, ads, or the word “ad”. */
+export function channelNameMatchesAdvertisingFocus(name: string): boolean {
+  const n = name.toLowerCase();
+  if (n.includes("advertisement")) return true;
+  if (n.includes("ads")) return true;
+  return /\bad\b/i.test(name);
+}
+
+/** Trade / seller channels. */
+export function channelNameMatchesSellingFocus(name: string): boolean {
+  const n = name.toLowerCase();
+  return n.includes("selling") || n.includes("seller");
+}
+
+/** Same filter as “Add channel” without “Show all” (suggested picks). */
 export function channelNameMatchesAdKeywords(name: string): boolean {
   const n = name.toLowerCase();
   for (const k of NAME_KEYWORDS) {
