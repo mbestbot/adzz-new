@@ -202,9 +202,49 @@
 .botMenuList {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0.15rem 0 0;
   max-height: 220px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(192, 132, 252, 0.55) rgba(18, 12, 28, 0.75);
+}
+
+.botMenuList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.botMenuList::-webkit-scrollbar-track {
+  margin: 6px 0;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.botMenuList::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(216, 180, 254, 0.7) 0%,
+    rgba(124, 58, 237, 0.55) 100%
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.2);
+}
+
+.botMenuList::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(244, 114, 182, 0.75) 0%,
+    rgba(139, 92, 246, 0.7) 100%
+  );
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.botMenuList::-webkit-scrollbar-thumb:active {
+  background: rgba(139, 92, 246, 0.85);
 }
 
 .botMenuItemRow {

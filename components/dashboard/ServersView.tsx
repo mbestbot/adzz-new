@@ -1347,7 +1347,7 @@ export function ServersView() {
       if (!sync.ok) {
         window.alert(
           sync.error ??
-            "Could not refresh from Discord. Is the backend running?"
+            "Could not refresh from Discord. If you see 502 in the network tab, nginx may be timing out before the API finishes — use at least proxy_read_timeout 180s on /adzz-api/ (see deploy/nginx-myadbot-full.conf) and confirm the Adzz API is running."
         );
         return;
       }
@@ -1397,11 +1397,20 @@ export function ServersView() {
           title: `Discord sync: ${label} (${i + 1} of ${n})`,
           mode: "indeterminate",
         });
-        const res = await apiFetch(
+        const fetchOpts = { timeoutMs: 180_000, quietLog: true } as const;
+        let res = await apiFetch(
           `/api/bots/${b.id}/guilds/sync`,
           { method: "POST" },
-          { timeoutMs: 120_000 }
+          fetchOpts
         );
+        if (!res.ok) {
+          await new Promise((r) => setTimeout(r, 3000));
+          res = await apiFetch(
+            `/api/bots/${b.id}/guilds/sync`,
+            { method: "POST" },
+            fetchOpts
+          );
+        }
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as {
             error?: string;

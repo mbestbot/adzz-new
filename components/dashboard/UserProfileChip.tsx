@@ -236,10 +236,10 @@ export function UserProfileChip() {
       <AddBotModal
         open={addModalOpen}
         onClose={() => setAddModalOpen(false)}
-        onComplete={async ({ botId }) => {
-          await refreshBots();
+        onComplete={({ botId }) => {
           setActiveBotId(botId);
           setAddModalOpen(false);
+          void refreshBots();
         }}
       />
     </>

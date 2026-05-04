@@ -653,22 +653,14 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
       const botId = data.bot?.id;
       if (!botId) throw new Error("Invalid response");
 
-      const syncRes = await apiFetch(
-        `/api/bots/${botId}/guilds/sync`,
-        { method: "POST" },
-        { timeoutMs: 120_000 }
-      );
-      if (!syncRes.ok) {
-        const syncBody = (await syncRes.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(
-          syncBody.error ??
-            "Bot was saved but Discord server sync failed. Try “Refresh from Discord” on the Servers page."
+      void Promise.resolve(onComplete({ botId })).catch((err) => {
+        console.error(err);
+        window.alert(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong after the bot was saved."
         );
-      }
-
-      await onComplete({ botId });
+      });
     } catch (e) {
       window.alert(e instanceof Error ? e.message : "Registration failed");
     } finally {
