@@ -451,6 +451,9 @@ export function ServersView() {
     channelAdsSent: {},
   });
   const slowmodeProbeAttemptedRef = useRef<Set<string>>(new Set());
+  /** After probe failures (e.g. gateway 502), pause probes to avoid hammering the API. */
+  const channelProbeCooldownUntilRef = useRef(0);
+  const [probeCooldownEpoch, setProbeCooldownEpoch] = useState(0);
   const adCampaignRef = useRef(adCampaign);
   const linkedByGuildRef = useRef(linkedByGuild);
 
@@ -703,10 +706,12 @@ export function ServersView() {
 
   useEffect(() => {
     slowmodeProbeAttemptedRef.current = new Set();
+    channelProbeCooldownUntilRef.current = 0;
   }, [activeBotId]);
 
   useEffect(() => {
     if (!activeBotId || !listedIdsKey) return;
+    if (Date.now() < channelProbeCooldownUntilRef.current) return;
     if (
       typeof document !== "undefined" &&
       document.visibilityState !== "visible"
@@ -714,8 +719,8 @@ export function ServersView() {
       return;
     }
 
-    const listed = adCampaign.listedChannelIds;
-    const slow = adCampaign.channelDiscordSlowmodeSec;
+    const listed = adCampaignRef.current.listedChannelIds;
+    const slow = adCampaignRef.current.channelDiscordSlowmodeSec;
     const toProbe: string[] = [];
     for (const rows of Object.values(linkedByGuild)) {
       for (const ch of rows ?? []) {
@@ -735,6 +740,7 @@ export function ServersView() {
     void (async () => {
       for (const channelId of toProbe) {
         if (cancelled) break;
+        if (Date.now() < channelProbeCooldownUntilRef.current) break;
         slowmodeProbeAttemptedRef.current.add(channelId);
         const res = await apiFetch(
           "/api/ad-campaign/probe-channel",
@@ -743,9 +749,16 @@ export function ServersView() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ botId: activeBotId, channelId }),
           },
-          { timeoutMs: 45_000 }
+          { timeoutMs: 45_000, quietLog: true }
         );
-        if (!cancelled && res.ok) {
+        if (!res.ok) {
+          channelProbeCooldownUntilRef.current = Date.now() + 120_000;
+          window.setTimeout(() => {
+            setProbeCooldownEpoch((n) => n + 1);
+          }, 121_000);
+          break;
+        }
+        if (!cancelled) {
           await fetchAdCampaign();
         }
         await new Promise((r) => setTimeout(r, 500));
@@ -754,14 +767,7 @@ export function ServersView() {
     return () => {
       cancelled = true;
     };
-  }, [
-    activeBotId,
-    listedIdsKey,
-    linkedByGuild,
-    fetchAdCampaign,
-    adCampaign.listedChannelIds,
-    adCampaign.channelDiscordSlowmodeSec,
-  ]);
+  }, [activeBotId, listedIdsKey, linkedByGuild, fetchAdCampaign, probeCooldownEpoch]);
 
   useEffect(() => {
     if (!activeBotId) return;
@@ -773,6 +779,7 @@ export function ServersView() {
         return;
       }
       void (async () => {
+        if (Date.now() < channelProbeCooldownUntilRef.current) return;
         const ac = adCampaignRef.current;
         const lb = linkedByGuildRef.current;
         if (!ac.enabled) return;
@@ -794,6 +801,7 @@ export function ServersView() {
           }
         }
         for (const channelId of toProbe) {
+          if (Date.now() < channelProbeCooldownUntilRef.current) break;
           const res = await apiFetch(
             "/api/ad-campaign/probe-channel",
             {
@@ -801,15 +809,22 @@ export function ServersView() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ botId: activeBotId, channelId }),
             },
-            { timeoutMs: 45_000 }
+            { timeoutMs: 45_000, quietLog: true }
           );
+          if (!res.ok) {
+            channelProbeCooldownUntilRef.current = Date.now() + 120_000;
+            window.setTimeout(() => {
+              setProbeCooldownEpoch((n) => n + 1);
+            }, 121_000);
+            break;
+          }
           if (res.ok) await fetchAdCampaign();
           await new Promise((r) => setTimeout(r, 500));
         }
       })();
     }, SLOWMODE_NO_SEND_PROBE_MS);
     return () => window.clearInterval(id);
-  }, [activeBotId, fetchAdCampaign]);
+  }, [activeBotId, fetchAdCampaign, probeCooldownEpoch]);
 
   useEffect(() => {
     if (!activeBotId) return;

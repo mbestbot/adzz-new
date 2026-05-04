@@ -37,6 +37,8 @@ const NETWORK_RETRY_BASE_MS = 350;
 export type ApiFetchOptions = {
   /** Abort the request after this many milliseconds (browser `fetch`). */
   timeoutMs?: number;
+  /** When true, failed `fetch` does not `console.error` (for noisy background polls). */
+  quietLog?: boolean;
 };
 
 function isLocalApiBase(): boolean {
@@ -146,7 +148,9 @@ export async function apiFetch(
     }
   }
   const hint = networkFailureHint(path, lastErr);
-  console.error(hint, lastErr);
+  if (!options?.quietLog) {
+    console.error(hint, lastErr);
+  }
   return new Response(JSON.stringify({ error: hint }), {
     status: 503,
     headers: { "Content-Type": "application/json" },
