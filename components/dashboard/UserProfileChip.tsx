@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown, Image, Plus } from "lucide-react";
+import { Check, ChevronDown, Image, Plus, Trash2 } from "lucide-react";
 import { discordAvatarUrl } from "@/lib/discordAvatar";
 import { AddBotModal } from "./AddBotModal";
 import { useBots } from "./BotContext";
@@ -15,6 +15,7 @@ export function UserProfileChip() {
     activeBotId,
     setActiveBotId,
     refreshBots,
+    deleteBot,
     refreshBotProfile,
   } = useBots();
   const [open, setOpen] = useState(false);
@@ -161,11 +162,12 @@ export function UserProfileChip() {
               ) : null}
               {bots.map((bot) => {
                 const selected = bot.id === activeBotId;
+                const label = bot.displayName || bot.username || "this bot";
                 return (
-                  <li key={bot.id}>
+                  <li key={bot.id} className={styles.botMenuItemRow}>
                     <button
                       type="button"
-                      className={`${styles.botMenuItem} ${selected ? styles.botMenuItemSelected : ""}`}
+                      className={`${styles.botMenuItem} ${styles.botMenuItemSelect} ${selected ? styles.botMenuItemSelected : ""}`}
                       role="option"
                       aria-selected={selected}
                       onClick={() => {
@@ -196,6 +198,33 @@ export function UserProfileChip() {
                           aria-hidden
                         />
                       )}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.botMenuDelete}
+                      aria-label={`Delete ${label}`}
+                      title="Delete bot"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        if (
+                          !window.confirm(
+                            `Delete bot "${label}"? This cannot be undone.`
+                          )
+                        ) {
+                          return;
+                        }
+                        void (async () => {
+                          const r = await deleteBot(bot.id);
+                          if (!r.ok) {
+                            window.alert(r.error ?? "Could not delete bot.");
+                            return;
+                          }
+                          close();
+                        })();
+                      }}
+                    >
+                      <Trash2 size={16} strokeWidth={2} aria-hidden />
                     </button>
                   </li>
                 );

@@ -41,7 +41,8 @@ type BotCtx = {
   bots: BotSummary[];
   activeBotId: string | null;
   setActiveBotId: (id: string) => void;
-  refreshBots: () => Promise<void>;
+  refreshBots: () => Promise<BotSummary[]>;
+  deleteBot: (botId: string) => Promise<{ ok: true } | { ok: false; error?: string }>;
   refreshBotProfile: (botId: string) => Promise<RefreshProfileResult>;
   syncing: boolean;
   syncGuilds: (botId: string) => Promise<SyncGuildsResult>;
@@ -63,15 +64,17 @@ export function BotProvider({ children }: { children: ReactNode }) {
   const [serverUiLinksByBot, setServerUiLinksByBot] =
     useState<ServerUiLinksByBot>({});
 
-  const refreshBots = useCallback(async () => {
+  const refreshBots = useCallback(async (): Promise<BotSummary[]> => {
     if (!user) {
       setBots([]);
-      return;
+      return [];
     }
     const res = await apiFetch("/api/bots");
-    if (!res.ok) return;
+    if (!res.ok) return [];
     const data = (await res.json()) as { bots: BotSummary[] };
-    setBots(data.bots ?? []);
+    const list = data.bots ?? [];
+    setBots(list);
+    return list;
   }, [user]);
 
   const refreshServerUiLinks = useCallback(async () => {
@@ -84,6 +87,38 @@ export function BotProvider({ children }: { children: ReactNode }) {
     const data = (await res.json()) as { links?: ServerUiLinksByBot };
     setServerUiLinksByBot(data.links ?? {});
   }, [user]);
+
+  const deleteBot = useCallback(
+    async (
+      botId: string
+    ): Promise<{ ok: true } | { ok: false; error?: string }> => {
+      const res = await apiFetch(`/api/bots/${encodeURIComponent(botId)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        return {
+          ok: false,
+          error: data.error ?? `Could not delete bot (${res.status})`,
+        };
+      }
+      const list = await refreshBots();
+      setActiveState((cur) => {
+        if (cur !== botId) return cur;
+        const next = list[0]?.id ?? null;
+        if (typeof window !== "undefined") {
+          if (next) localStorage.setItem(ACTIVE_BOT_KEY, next);
+          else localStorage.removeItem(ACTIVE_BOT_KEY);
+        }
+        return next;
+      });
+      await refreshServerUiLinks();
+      return { ok: true };
+    },
+    [refreshBots, refreshServerUiLinks]
+  );
 
   const saveServerUiLinks = useCallback(
     async (
@@ -166,15 +201,29 @@ export function BotProvider({ children }: { children: ReactNode }) {
 
   const syncGuilds = useCallback(async (botId: string) => {
     setSyncing(true);
+    const fetchOpts = { timeoutMs: 180_000, quietLog: true } as const;
     try {
-      const res = await apiFetch(
+      let res = await apiFetch(
         `/api/bots/${botId}/guilds/sync`,
         { method: "POST" },
-        { timeoutMs: 120_000 }
+        fetchOpts
       );
+      if (!res.ok) {
+        await new Promise((r) => setTimeout(r, 3000));
+        res = await apiFetch(
+          `/api/bots/${botId}/guilds/sync`,
+          { method: "POST" },
+          fetchOpts
+        );
+      }
       if (res.ok) return { ok: true as const };
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      return { ok: false as const, error: data.error };
+      return {
+        ok: false as const,
+        error:
+          data.error ??
+          `Sync failed (HTTP ${res.status}). A 502 from the host usually means nginx timed out or could not reach the API — check proxy_read_timeout for /adzz-api/ and that Node is listening on port 5020.`,
+      };
     } finally {
       setSyncing(false);
     }
@@ -186,6 +235,7 @@ export function BotProvider({ children }: { children: ReactNode }) {
       activeBotId,
       setActiveBotId,
       refreshBots,
+      deleteBot,
       refreshBotProfile,
       syncing,
       syncGuilds,
@@ -198,6 +248,7 @@ export function BotProvider({ children }: { children: ReactNode }) {
       activeBotId,
       setActiveBotId,
       refreshBots,
+      deleteBot,
       refreshBotProfile,
       syncing,
       syncGuilds,
