@@ -10,7 +10,8 @@ import styles from "./userRowActions.module.css";
 type DialogState =
   | null
   | { kind: "plan"; tier: "pro" | "business" }
-  | { kind: "extend" };
+  | { kind: "extend" }
+  | { kind: "password" };
 
 function parseDaysInput(raw: string) {
   const n = Number(String(raw).trim());
@@ -45,11 +46,17 @@ export function UserRowActions({
   const [manageOpen, setManageOpen] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [daysInput, setDaysInput] = useState("30");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
 
   useEffect(() => {
     if (!manageOpen && !dialog) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (dialog?.kind === "password") {
+        setPasswordInput("");
+        setConfirmPasswordInput("");
+      }
       if (dialog) setDialog(null);
       else if (manageOpen) setManageOpen(false);
     };
@@ -95,8 +102,29 @@ export function UserRowActions({
     setDialog(null);
   };
 
+  const applyPassword = () => {
+    if (!dialog || dialog.kind !== "password") return;
+    const p = passwordInput;
+    if (p.length < 6) {
+      onError("Password must be at least 6 characters");
+      return;
+    }
+    if (p !== confirmPasswordInput) {
+      onError("Passwords do not match");
+      return;
+    }
+    void run(() =>
+      adminPostJson<UsersListResponse>(`${base}/password`, { password: p })
+    );
+    setPasswordInput("");
+    setConfirmPasswordInput("");
+    setDialog(null);
+  };
+
   const daysModal =
-    dialog && typeof document !== "undefined"
+    dialog &&
+    (dialog.kind === "plan" || dialog.kind === "extend") &&
+    typeof document !== "undefined"
       ? createPortal(
           <div
             className={styles.overlayDays}
@@ -142,6 +170,85 @@ export function UserRowActions({
                   onClick={dialog.kind === "plan" ? applyPlan : applyExtend}
                 >
                   Apply
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  const passwordModal =
+    dialog?.kind === "password" && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className={styles.overlayDays}
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setPasswordInput("");
+                setConfirmPasswordInput("");
+                setDialog(null);
+              }
+            }}
+          >
+            <div
+              className={styles.modal}
+              role="dialog"
+              aria-modal
+              aria-labelledby="admin-password-title"
+            >
+              <h2 id="admin-password-title" className={styles.modalTitle}>
+                Set login password
+              </h2>
+              <p className={styles.modalHint}>
+                Lets them sign in with this account&apos;s email and password (e.g.
+                after Discord-only signup). Share the password securely; it is not
+                shown again.
+              </p>
+              <label className={styles.modalLabel} htmlFor={`admin-pw-${user.id}`}>
+                New password
+              </label>
+              <input
+                id={`admin-pw-${user.id}`}
+                className={styles.modalInput}
+                type="password"
+                autoComplete="new-password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+              />
+              <label
+                className={styles.modalLabel}
+                htmlFor={`admin-pw2-${user.id}`}
+              >
+                Confirm password
+              </label>
+              <input
+                id={`admin-pw2-${user.id}`}
+                className={styles.modalInput}
+                type="password"
+                autoComplete="new-password"
+                value={confirmPasswordInput}
+                onChange={(e) => setConfirmPasswordInput(e.target.value)}
+              />
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtn}
+                  onClick={() => {
+                    setPasswordInput("");
+                    setConfirmPasswordInput("");
+                    setDialog(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.modalBtn} ${styles.modalBtnPrimary}`}
+                  onClick={applyPassword}
+                >
+                  Save password
                 </button>
               </div>
             </div>
@@ -344,6 +451,18 @@ export function UserRowActions({
                   <div className={styles.btnRow}>
                     <button
                       type="button"
+                      className={styles.btn}
+                      disabled={busy}
+                      onClick={() => {
+                        setPasswordInput("");
+                        setConfirmPasswordInput("");
+                        setDialog({ kind: "password" });
+                      }}
+                    >
+                      Set login password
+                    </button>
+                    <button
+                      type="button"
                       className={`${styles.btn} ${styles.btnDanger}`}
                       disabled={busy}
                       onClick={() => {
@@ -371,6 +490,7 @@ export function UserRowActions({
   return (
     <td className={styles.actionsCell}>
       {daysModal}
+      {passwordModal}
       {managePanel}
       <button
         type="button"

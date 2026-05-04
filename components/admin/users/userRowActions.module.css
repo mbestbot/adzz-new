@@ -337,6 +337,13 @@
   color: #fafafa;
 }
 
+.modalHint {
+  margin: 0 0 1rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #a1a1aa;
+}
+
 .modalLabel {
   display: block;
   margin-bottom: 0.35rem;

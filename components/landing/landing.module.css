@@ -494,6 +494,17 @@
   line-height: 1.55;
 }
 
+.sectionLead a {
+  color: #e9d5ff;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.sectionLead a:hover {
+  color: #faf5ff;
+}
+
 .pricingHead {
   text-align: center;
   margin: 0 auto 2.75rem;

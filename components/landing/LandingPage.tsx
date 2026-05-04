@@ -14,6 +14,11 @@ import {
   Wrench,
   Zap,
 } from "lucide-react";
+import {
+  PLAN_LAUNCH_USD,
+  PLAN_ROBUX_PER_MONTH,
+  SUPPORT_DISCORD_URL,
+} from "@/lib/planPricing";
 import styles from "./landing.module.css";
 import { LandingNav } from "./LandingNav";
 
@@ -322,7 +327,10 @@ export function LandingPage() {
             </h2>
             <p className={styles.pricingLead}>
               Two plans — both include the full core platform. Business adds
-              campaign quota controls for high-volume teams.
+              campaign quota controls for high-volume teams. Pay in{" "}
+              <strong>USD</strong> (card via Stripe) or <strong>Robux</strong>{" "}
+              (see each card). Robux purchases are handled in Discord — open a
+              ticket in our server after you join.
             </p>
           </div>
           <div className={styles.pricingRow}>
@@ -343,10 +351,21 @@ export function LandingPage() {
             <article className={styles.planCard}>
               <h3 className={styles.planName}>Adzz Pro</h3>
               <div className={styles.priceRow}>
-                <span className={styles.priceWas}>$11.99</span>
-                <span className={styles.priceNow}>$6.99</span>
+                <span className={styles.priceWas}>
+                  ${PLAN_LAUNCH_USD.pro.was.toFixed(2)}
+                </span>
+                <span className={styles.priceNow}>
+                  ${PLAN_LAUNCH_USD.pro.now.toFixed(2)}
+                </span>
                 <span className={styles.pricePeriod}>/ month</span>
                 <span className={styles.launchTag}>Launch offer</span>
+                <span className={styles.priceNote}>
+                  or{" "}
+                  <strong>
+                    {PLAN_ROBUX_PER_MONTH.pro.toLocaleString()} Robux
+                  </strong>{" "}
+                  / month
+                </span>
               </div>
               <p className={styles.planLead}>
                 Full access to bots, servers, analytics, ad pool, campaigns, and
@@ -371,10 +390,21 @@ export function LandingPage() {
               <span className={styles.planBadge}>Most flexible</span>
               <h3 className={styles.planName}>Adzz Business</h3>
               <div className={styles.priceRow}>
-                <span className={styles.priceWas}>$18.99</span>
-                <span className={styles.priceNow}>$12.99</span>
+                <span className={styles.priceWas}>
+                  ${PLAN_LAUNCH_USD.business.was.toFixed(2)}
+                </span>
+                <span className={styles.priceNow}>
+                  ${PLAN_LAUNCH_USD.business.now.toFixed(2)}
+                </span>
                 <span className={styles.pricePeriod}>/ month</span>
                 <span className={styles.launchTag}>Launch offer</span>
+                <span className={styles.priceNote}>
+                  or{" "}
+                  <strong>
+                    {PLAN_ROBUX_PER_MONTH.business.toLocaleString()} Robux
+                  </strong>{" "}
+                  / month
+                </span>
               </div>
               <p className={styles.planLead}>
                 Everything in Pro, plus advanced campaign targeting and automatic
@@ -399,8 +429,16 @@ export function LandingPage() {
             className={styles.sectionLead}
             style={{ marginTop: "1.5rem", marginBottom: 0 }}
           >
-            Subscribe from the app after you sign in — billing is handled securely
-            with Stripe.
+            <strong>USD:</strong> subscribe from the app after you sign in — Stripe
+            handles card billing. <strong>Robux:</strong> join{" "}
+            <a
+              href={SUPPORT_DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              our Discord
+            </a>{" "}
+            and open a support ticket to purchase your plan with Robux.
           </p>
         </section>
 
@@ -408,7 +446,7 @@ export function LandingPage() {
           <span>© {new Date().getFullYear()} Adzz</span>
           <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
             <a
-              href="https://discord.gg/adzz"
+              href={SUPPORT_DISCORD_URL}
               target="_blank"
               rel="noopener noreferrer"
             >

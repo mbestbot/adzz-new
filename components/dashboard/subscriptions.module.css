@@ -70,6 +70,17 @@
   color: var(--dash-muted);
 }
 
+.leadLink {
+  color: var(--dash-accent-mid);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.leadLink:hover {
+  color: var(--dash-accent);
+}
+
 .refresh {
   flex-shrink: 0;
   padding: 0.45rem 0.9rem;

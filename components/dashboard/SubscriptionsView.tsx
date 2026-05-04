@@ -5,6 +5,11 @@ import type { CSSProperties } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Crown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import {
+  PLAN_LAUNCH_USD,
+  PLAN_ROBUX_PER_MONTH,
+  SUPPORT_DISCORD_URL,
+} from "@/lib/planPricing";
 import { useSubscription } from "@/components/dashboard/SubscriptionContext";
 import pack from "./icon-pack.module.css";
 import styles from "./subscriptions.module.css";
@@ -265,8 +270,19 @@ export function SubscriptionsView() {
           </p>
           <h1 className={styles.title}>Subscriptions</h1>
           <p className={styles.lead}>
-            Pro and Business are billed monthly through Stripe. Use{" "}
-            <strong>Manage subscription</strong> below to open billing, cancel
+            Pay monthly in <strong>USD</strong> with Stripe (use{" "}
+            <strong>Subscribe</strong> below) or in <strong>Robux</strong> at the
+            rates on each card — for Robux, join{" "}
+            <a
+              href={SUPPORT_DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.leadLink}
+            >
+              our Discord
+            </a>{" "}
+            and open a ticket so we can complete your purchase. Use{" "}
+            <strong>Manage subscription</strong> below for Stripe billing, cancel
             renewal, or end access immediately.
           </p>
         </div>
@@ -319,9 +335,20 @@ export function SubscriptionsView() {
             <div className={styles.planCardHead}>
               <h3 className={styles.planCardName}>Adzz Pro</h3>
               <div className={styles.priceBlock}>
-                <span className={styles.priceWas}>$11.99</span>
-                <span className={styles.priceNow}>$6.99</span>
+                <span className={styles.priceWas}>
+                  ${PLAN_LAUNCH_USD.pro.was.toFixed(2)}
+                </span>
+                <span className={styles.priceNow}>
+                  ${PLAN_LAUNCH_USD.pro.now.toFixed(2)}
+                </span>
                 <span className={styles.launchTag}>Launch offer</span>
+                <span className={styles.priceNote}>
+                  or{" "}
+                  <strong>
+                    {PLAN_ROBUX_PER_MONTH.pro.toLocaleString()} Robux
+                  </strong>{" "}
+                  / month
+                </span>
               </div>
               <p className={styles.whatsIncluded}>What&apos;s included</p>
               <ul className={styles.featureList}>
@@ -360,9 +387,20 @@ export function SubscriptionsView() {
             <div className={styles.planCardHead}>
               <h3 className={styles.planCardName}>Adzz Business</h3>
               <div className={styles.priceBlock}>
-                <span className={styles.priceWas}>$18.99</span>
-                <span className={styles.priceNow}>$12.99</span>
+                <span className={styles.priceWas}>
+                  ${PLAN_LAUNCH_USD.business.was.toFixed(2)}
+                </span>
+                <span className={styles.priceNow}>
+                  ${PLAN_LAUNCH_USD.business.now.toFixed(2)}
+                </span>
                 <span className={styles.launchTag}>Launch offer</span>
+                <span className={styles.priceNote}>
+                  or{" "}
+                  <strong>
+                    {PLAN_ROBUX_PER_MONTH.business.toLocaleString()} Robux
+                  </strong>{" "}
+                  / month
+                </span>
               </div>
               <p className={styles.whatsIncluded}>What&apos;s included</p>
               <ul className={styles.featureList}>
