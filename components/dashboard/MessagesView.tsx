@@ -47,6 +47,9 @@ type ApiCampaignRow = {
   sendPeriod?: boolean;
   targets?: ApiTarget[];
   lastSendError?: string | null;
+  /** Persisted UI toggle from API */
+  allBotsSelected?: boolean;
+  allServersSelected?: boolean;
 };
 
 type MessagesTab = "basic" | "campaign" | "adpool";
@@ -68,6 +71,8 @@ type ApiMessagesState = {
     intervalLabel: string;
     intervalMs: number;
     targets?: ApiTarget[];
+    allBotsSelected?: boolean;
+    allServersSelected?: boolean;
   } | null;
 };
 
@@ -124,15 +129,22 @@ function hydrateCampaignFromApi(
     };
   }
   const botIdSet = new Set(targets.map((t) => t.botId));
-  const allBots =
+  const inferredAllBots =
     bots.length > 0 &&
     botIdSet.size === bots.length &&
     bots.every((b) => botIdSet.has(b.id));
+  const allBotsSelected =
+    api.allBotsSelected === true
+      ? true
+      : api.allBotsSelected === false
+        ? false
+        : inferredAllBots;
   const guildIdSet = new Set(
     targets
       .map((t) => String(t.guildId ?? "").trim())
       .filter(Boolean)
   );
+  const allServersSelected = api.allServersSelected === true;
   const label = api.intervalLabel ?? "1 Hour(s)";
   return {
     id: api.id,
@@ -141,10 +153,10 @@ function hydrateCampaignFromApi(
       typeof api.message === "string" && api.message.trim()
         ? api.message
         : "",
-    allBotsSelected: allBots,
-    selectedBotIds: allBots ? [] : [...botIdSet],
-    allServersSelected: false,
-    selectedServerIds: [...guildIdSet],
+    allBotsSelected,
+    selectedBotIds: allBotsSelected ? [] : [...botIdSet],
+    allServersSelected,
+    selectedServerIds: allServersSelected ? [] : [...guildIdSet],
     interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
     sendPeriod: Boolean(api.sendPeriod),
     inactivityTimeout: false,
@@ -176,21 +188,28 @@ function hydrateAdPoolFromApi(
     };
   }
   const botIdSet = new Set(targets.map((t) => t.botId));
-  const allBots =
+  const inferredAllBots =
     bots.length > 0 &&
     botIdSet.size === bots.length &&
     bots.every((b) => botIdSet.has(b.id));
+  const allBotsSelected =
+    api.allBotsSelected === true
+      ? true
+      : api.allBotsSelected === false
+        ? false
+        : inferredAllBots;
   const guildIdSet = new Set(
     targets
       .map((t) => String(t.guildId ?? "").trim())
       .filter(Boolean)
   );
+  const allServersSelected = api.allServersSelected === true;
   return {
     messages,
-    allBotsSelected: allBots,
-    selectedBotIds: allBots ? [] : [...botIdSet],
-    allServersSelected: false,
-    selectedServerIds: [...guildIdSet],
+    allBotsSelected,
+    selectedBotIds: allBotsSelected ? [] : [...botIdSet],
+    allServersSelected,
+    selectedServerIds: allServersSelected ? [] : [...guildIdSet],
     interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
     serversCollapsed: true,
   };
@@ -720,6 +739,8 @@ export function MessagesView() {
               title: c.title,
               targets,
               allowEmptyTargets,
+              allBotsSelected: c.allBotsSelected,
+              allServersSelected: c.allServersSelected,
             }),
           });
           return { id: c.id, ok: res.ok, res };
@@ -967,6 +988,8 @@ export function MessagesView() {
             messages: draft.messages,
             intervalLabel: draft.interval,
             targets,
+            allBotsSelected: draft.allBotsSelected,
+            allServersSelected: draft.allServersSelected,
           },
         }),
       });
