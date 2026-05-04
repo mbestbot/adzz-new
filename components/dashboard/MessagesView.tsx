@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   ChevronDown,
   ChevronRight,
   Plus,
   RotateCcw,
+  Save,
   Trash2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
@@ -111,9 +111,9 @@ function hydrateCampaignFromApi(
         typeof api.message === "string" && api.message.trim()
           ? api.message
           : "",
-      allBotsSelected: true,
+      allBotsSelected: false,
       selectedBotIds: [],
-      allServersSelected: true,
+      allServersSelected: false,
       selectedServerIds: [],
       interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
       sendPeriod: Boolean(api.sendPeriod),
@@ -167,9 +167,9 @@ function hydrateAdPoolFromApi(
   if (targets.length === 0) {
     return {
       messages,
-      allBotsSelected: true,
+      allBotsSelected: false,
       selectedBotIds: [],
-      allServersSelected: true,
+      allServersSelected: false,
       selectedServerIds: [],
       interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
       serversCollapsed: true,
@@ -460,7 +460,6 @@ function sameOrderedStrings(a: string[], b: string[]): boolean {
 }
 
 export function MessagesView() {
-  const pathname = usePathname();
   const { user } = useAuth();
   const { bots, serverUiLinksByBot } = useBots();
   const botsRef = useRef(bots);
@@ -476,7 +475,6 @@ export function MessagesView() {
   );
   const [campaignsHydrated, setCampaignsHydrated] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
-  const [linkedTargetsEpoch, setLinkedTargetsEpoch] = useState(0);
 
   const [messagesTab, setMessagesTab] = useState<MessagesTab>("basic");
   const [messagesState, setMessagesState] = useState<ApiMessagesState | null>(
@@ -494,16 +492,31 @@ export function MessagesView() {
 
   const [adPoolDraft, setAdPoolDraft] = useState<AdPoolLocal>(() => ({
     messages: ["", "", ""],
-    allBotsSelected: true,
+    allBotsSelected: false,
     selectedBotIds: [],
-    allServersSelected: true,
+    allServersSelected: false,
     selectedServerIds: [],
     interval: "1 Hour(s)",
     serversCollapsed: true,
   }));
   const adPoolHydratedRef = useRef(false);
 
-  const skipNextSave = useRef(true);
+  const [basicSaveBusy, setBasicSaveBusy] = useState(false);
+  const [adPoolSaveBusy, setAdPoolSaveBusy] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const saveFeedbackTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(
+    null
+  );
+  const flashSaveFeedback = useCallback((msg: string) => {
+    if (saveFeedbackTimerRef.current) {
+      globalThis.clearTimeout(saveFeedbackTimerRef.current);
+    }
+    setSaveFeedback(msg);
+    saveFeedbackTimerRef.current = globalThis.setTimeout(() => {
+      setSaveFeedback(null);
+      saveFeedbackTimerRef.current = null;
+    }, 2500);
+  }, []);
 
   useEffect(() => {
     if (!user?.id) {
@@ -589,6 +602,9 @@ export function MessagesView() {
     return m;
   }, [campaigns, bots, guildsByBot]);
 
+  const mergedRef = useRef(mergedServersByCampaignId);
+  mergedRef.current = mergedServersByCampaignId;
+
   useEffect(() => {
     setCampaigns((prev) => {
       const next = prev.map((c) => {
@@ -633,22 +649,6 @@ export function MessagesView() {
   }, [bots]);
 
   useEffect(() => {
-    if (pathname === "/messages") {
-      setLinkedTargetsEpoch((n) => n + 1);
-    }
-  }, [pathname]);
-
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState === "visible") {
-        setLinkedTargetsEpoch((n) => n + 1);
-      }
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
-
-  useEffect(() => {
     if (!user?.id) {
       setCampaignsHydrated(true);
       return;
@@ -670,7 +670,6 @@ export function MessagesView() {
         setCampaigns(list);
         setPreviewCampaignId((p) => p ?? list[0]?.id ?? null);
         setCampaignsHydrated(true);
-        skipNextSave.current = true;
       }
     })();
     return () => {
@@ -678,60 +677,24 @@ export function MessagesView() {
     };
   }, [user?.id]);
 
-  const savePayloadSig = useMemo(() => {
-    return campaigns
-      .map((c) => {
-        const merged = mergedServersByCampaignId.get(c.id) ?? [];
-        const eBots = effectiveBots(c, bots);
-        const eSrv = new Set(effectiveServerIdsForCampaign(c, merged));
-        const n = buildAdTargets(eBots, eSrv, serverUiLinksByBot).length;
-        return [
-          c.id,
-          c.title,
-          c.message,
-          c.interval,
-          c.sendPeriod ? 1 : 0,
-          [...eBots].sort().join(","),
-          [...eSrv].sort().join(","),
-          n,
-          linkedTargetsEpoch,
-          unionBotIds.every((id) => id in guildsByBot) ? "1" : "0",
-        ].join("\t");
-      })
-      .join("|");
-  }, [
-    campaigns,
-    mergedServersByCampaignId,
-    bots,
-    linkedTargetsEpoch,
-    guildsByBot,
-    unionBotIds,
-    serverUiLinksByBot,
-  ]);
-
-  const mergedRef = useRef(mergedServersByCampaignId);
-  mergedRef.current = mergedServersByCampaignId;
-
-  useEffect(() => {
+  const saveBasicCampaigns = useCallback(async () => {
     if (!user?.id || !campaignsHydrated) return;
-    if (skipNextSave.current) {
-      skipNextSave.current = false;
-      return;
-    }
-    const t = window.setTimeout(async () => {
-      const list = campaignsRef.current;
-      const mergedMap = mergedRef.current;
-      const gb = guildsByBotRef.current;
-
-      /* Do not PUT until guild cache exists for each bot — otherwise merged
-       * servers are empty, targets become [], and the API wipes posting stats. */
-      for (const camp of list) {
-        for (const bid of effectiveBots(camp, botsRef.current)) {
-          if (!(bid in gb)) return;
+    const list = campaignsRef.current;
+    const mergedMap = mergedRef.current;
+    const gb = guildsByBotRef.current;
+    for (const camp of list) {
+      for (const bid of effectiveBots(camp, botsRef.current)) {
+        if (!(bid in gb)) {
+          setGlobalError(
+            "Still loading server data for your bots. Wait a moment, then try Save again."
+          );
+          return;
         }
       }
-
-      setGlobalError(null);
+    }
+    setBasicSaveBusy(true);
+    setGlobalError(null);
+    try {
       const results = await Promise.all(
         list.map(async (c) => {
           const merged = mergedMap.get(c.id) ?? [];
@@ -774,14 +737,25 @@ export function MessagesView() {
             x.id === failed.id ? { ...x, lastSendError: msg } : x
           )
         );
-      } else {
-        setCampaigns((prev) =>
-          prev.map((x) => ({ ...x, lastSendError: null }))
-        );
+        return;
       }
-    }, 900);
-    return () => window.clearTimeout(t);
-  }, [savePayloadSig, user?.id, campaignsHydrated]);
+      setCampaigns((prev) =>
+        prev.map((x) => ({ ...x, lastSendError: null }))
+      );
+      const reload = await apiFetch("/api/ad-campaign");
+      if (reload.ok) {
+        const data = (await reload.json()) as { campaigns?: ApiCampaignRow[] };
+        const b = botsRef.current;
+        const nextList = (data.campaigns ?? []).map((row) =>
+          hydrateCampaignFromApi(row, b)
+        );
+        setCampaigns(nextList);
+      }
+      flashSaveFeedback("Saved");
+    } finally {
+      setBasicSaveBusy(false);
+    }
+  }, [user?.id, campaignsHydrated, flashSaveFeedback]);
 
   const previewCampaign =
     campaigns.find((c) => c.id === previewCampaignId) ?? campaigns[0] ?? null;
@@ -834,7 +808,6 @@ export function MessagesView() {
       if (p !== id) return p ?? next[0]?.id ?? null;
       return next[0]?.id ?? null;
     });
-    skipNextSave.current = true;
   }, []);
 
   const updateCampaign = useCallback((id: string, patch: Partial<LocalCampaign>) => {
@@ -850,9 +823,9 @@ export function MessagesView() {
           ? {
               ...c,
               message: "",
-              allBotsSelected: true,
+              allBotsSelected: false,
               selectedBotIds: [],
-              allServersSelected: true,
+              allServersSelected: false,
               selectedServerIds: [],
               interval: "1 Hour(s)",
               sendPeriod: true,
@@ -863,12 +836,12 @@ export function MessagesView() {
     );
   }, []);
 
-  const refreshMessagesState = useCallback(async () => {
+  const refreshMessagesState = useCallback(async (syncAdPoolDraft?: boolean) => {
     const res = await apiFetch("/api/messages-state");
     if (!res.ok) return;
     const data = (await res.json()) as ApiMessagesState;
     setMessagesState(data);
-    if (!adPoolHydratedRef.current && data.adPool) {
+    if (data.adPool && (!adPoolHydratedRef.current || syncAdPoolDraft)) {
       setAdPoolDraft(hydrateAdPoolFromApi(data.adPool, botsRef.current));
       adPoolHydratedRef.current = true;
     }
@@ -964,61 +937,50 @@ export function MessagesView() {
     }
   }, [refreshMessagesState]);
 
-  const adPoolSaveSig = useMemo(() => {
-    const eBots = effectivePoolBots(adPoolDraft, bots);
-    const eSrv = new Set(
-      effectivePoolServers(adPoolDraft, adPoolMergedServers)
-    );
-    const n = buildAdTargets(eBots, eSrv, serverUiLinksByBot).length;
-    return [
-      messagesTab,
-      adPoolDraft.messages.join("\u0001"),
-      adPoolDraft.interval,
-      adPoolDraft.allBotsSelected ? "1" : "0",
-      [...adPoolDraft.selectedBotIds].sort().join(","),
-      adPoolDraft.allServersSelected ? "1" : "0",
-      [...adPoolDraft.selectedServerIds].sort().join(","),
-      n,
-      linkedTargetsEpoch,
-    ].join("|");
-  }, [
-    messagesTab,
-    adPoolDraft,
-    bots,
-    adPoolMergedServers,
-    linkedTargetsEpoch,
-    serverUiLinksByBot,
-  ]);
-
-  useEffect(() => {
-    if (messagesTab !== "adpool") return;
+  const saveAdPool = useCallback(async () => {
     if (!user?.id) return;
-    for (const bid of effectivePoolBots(adPoolDraft, bots)) {
-      if (!(bid in guildsByBot)) return;
+    const draft = adPoolDraft;
+    for (const bid of effectivePoolBots(draft, bots)) {
+      if (!(bid in guildsByBot)) {
+        setGlobalError(
+          "Still loading server data for your bots. Wait a moment, then try Save again."
+        );
+        return;
+      }
     }
-    const t = window.setTimeout(() => {
-      const eBots = effectivePoolBots(adPoolDraft, botsRef.current);
+    setAdPoolSaveBusy(true);
+    setGlobalError(null);
+    try {
+      const eBots = effectivePoolBots(draft, botsRef.current);
       const merged = mergedServersForBotIds(eBots, guildsByBotRef.current);
       const targets = buildAdTargets(
         eBots,
-        new Set(effectivePoolServers(adPoolDraft, merged)),
+        new Set(effectivePoolServers(draft, merged)),
         serverUiLinksRef.current
       );
-      void apiFetch("/api/messages-state", {
+      const res = await apiFetch("/api/messages-state", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           uiMode: "adpool",
           adPool: {
-            messages: adPoolDraft.messages,
-            intervalLabel: adPoolDraft.interval,
+            messages: draft.messages,
+            intervalLabel: draft.interval,
             targets,
           },
         }),
-      }).then(() => refreshMessagesState());
-    }, 900);
-    return () => window.clearTimeout(t);
-  }, [adPoolSaveSig, messagesTab, user?.id, guildsByBot, refreshMessagesState]);
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        setGlobalError(data.error ?? `Save failed (${res.status})`);
+        return;
+      }
+      await refreshMessagesState(true);
+      flashSaveFeedback("Saved");
+    } finally {
+      setAdPoolSaveBusy(false);
+    }
+  }, [user?.id, adPoolDraft, bots, guildsByBot, refreshMessagesState, flashSaveFeedback]);
 
   if (!bots.length) {
     return (
@@ -1049,8 +1011,8 @@ export function MessagesView() {
           <p className={styles.lead}>
             Create one or more campaigns—each can use different bots, servers,
             and ad copy. Cooldowns apply per campaign. Delivery uses channels
-            you linked on the <strong>Servers</strong> page. Changes here save
-            automatically.
+            you linked on the <strong>Servers</strong> page. Use{" "}
+            <strong>Save</strong> on the Basic or Ad pool tab to persist changes.
           </p>
         </div>
       </header>
@@ -1091,6 +1053,12 @@ export function MessagesView() {
         </p>
       ) : null}
 
+      {saveFeedback ? (
+        <p className={styles.saveFeedbackOk} role="status" style={{ marginBottom: "1rem" }}>
+          {saveFeedback}
+        </p>
+      ) : null}
+
       {messagesTab === "basic" ? (
         <>
           {messagesState?.burst ? (
@@ -1112,6 +1080,33 @@ export function MessagesView() {
             </div>
           ) : null}
           <div className={styles.grid}>
+            <div className={styles.saveBarSpan}>
+              <div className={styles.saveActionsBar} role="region" aria-label="Save basic campaigns">
+                <p className={styles.saveActionsHint}>
+                  Save targets, message text, and schedule for every campaign on
+                  this tab.
+                </p>
+                <div className={styles.saveActionsBtns}>
+                  <button
+                    type="button"
+                    className={styles.primaryBtn}
+                    disabled={
+                      basicSaveBusy || !campaignsHydrated || !campaigns.length
+                    }
+                    onClick={() => void saveBasicCampaigns()}
+                  >
+                    {basicSaveBusy ? (
+                      "Saving…"
+                    ) : (
+                      <>
+                        <Save size={16} strokeWidth={2} aria-hidden />
+                        Save
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
         <div className={styles.colForm}>
           {campaigns.map((c) => {
             const merged = mergedServersByCampaignId.get(c.id) ?? [];
@@ -1660,6 +1655,31 @@ export function MessagesView() {
 
       {messagesTab === "adpool" ? (
         <div className={styles.grid}>
+          <div className={styles.saveBarSpan}>
+            <div className={styles.saveActionsBar} role="region" aria-label="Save ad pool">
+              <p className={styles.saveActionsHint}>
+                Save rotation messages, targets, and interval. Switching tabs
+                still updates which mode the server uses for posting.
+              </p>
+              <div className={styles.saveActionsBtns}>
+                <button
+                  type="button"
+                  className={styles.primaryBtn}
+                  disabled={adPoolSaveBusy || !user?.id}
+                  onClick={() => void saveAdPool()}
+                >
+                  {adPoolSaveBusy ? (
+                    "Saving…"
+                  ) : (
+                    <>
+                      <Save size={16} strokeWidth={2} aria-hidden />
+                      Save
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
           <div className={styles.colForm}>
             <p className={styles.poolHint}>
               Ad pool rotates through your messages in order (first send uses ad
