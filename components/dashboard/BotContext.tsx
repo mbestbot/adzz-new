@@ -201,7 +201,7 @@ export function BotProvider({ children }: { children: ReactNode }) {
 
   const syncGuilds = useCallback(async (botId: string) => {
     setSyncing(true);
-    const fetchOpts = { timeoutMs: 180_000, quietLog: true } as const;
+    const fetchOpts = { timeoutMs: 300_000, quietLog: true } as const;
     try {
       let res = await apiFetch(
         `/api/bots/${botId}/guilds/sync`,

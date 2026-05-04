@@ -1335,6 +1335,23 @@ export function ServersView() {
     fetchBanner?.ease?.max,
   ]);
 
+  const resetFetchBannerAfterRun = useCallback(async (finishedOk: boolean) => {
+    syncBarStopRef.current = true;
+    if (syncAnimFrameRef.current != null) {
+      cancelAnimationFrame(syncAnimFrameRef.current);
+      syncAnimFrameRef.current = null;
+    }
+    if (finishedOk) {
+      setSyncBarPercent(100);
+      syncBarProgressRef.current = 100;
+      await new Promise((r) => setTimeout(r, 160));
+    }
+    setFetchBanner(null);
+    setSyncBarPercent(0);
+    syncBarProgressRef.current = 0;
+    syncBarStopRef.current = false;
+  }, []);
+
   const onRefreshDiscord = async () => {
     if (!activeBotId) return;
     let finishedOk = false;
@@ -1352,119 +1369,86 @@ export function ServersView() {
         return;
       }
       setFetchBanner({
-        title: "Loading servers, campaign targets, and connection status…",
+        title: "Loading servers…",
         mode: "determinate",
         ease: {
-          min: Math.max(58, Math.min(84, syncBarProgressRef.current - 1)),
-          max: 97,
+          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
+          max: 72,
         },
       });
       await loadGuilds();
+      setFetchBanner({
+        title: "Saving campaign & connection…",
+        mode: "determinate",
+        ease: {
+          min: Math.max(62, Math.min(78, syncBarProgressRef.current)),
+          max: 94,
+        },
+      });
       await fetchAdCampaign();
       await fetchDiscordConnectionStatus();
       await refreshServerUiLinks();
       finishedOk = true;
     } finally {
-      syncBarStopRef.current = true;
-      if (syncAnimFrameRef.current != null) {
-        cancelAnimationFrame(syncAnimFrameRef.current);
-        syncAnimFrameRef.current = null;
-      }
-      if (finishedOk) {
-        setSyncBarPercent(100);
-        syncBarProgressRef.current = 100;
-        await new Promise((r) => setTimeout(r, 160));
-      }
-      setFetchBanner(null);
-      setSyncBarPercent(0);
-      syncBarProgressRef.current = 0;
-      syncBarStopRef.current = false;
+      await resetFetchBannerAfterRun(finishedOk);
     }
   };
 
-  /** Sync guild/channel cache from Discord for every bot, then reload UI data. */
-  const onReloadAllServersAndData = useCallback(async () => {
-    if (!bots.length) return;
+  /** Sync guild/channel cache from Discord for the selected bot only, then reload UI in stages. */
+  const onReloadActiveBotServersAndData = useCallback(async () => {
+    if (!activeBotId || !bots.length) return;
+    const activeBot = bots.find((b) => b.id === activeBotId);
+    const label = activeBot?.displayName ?? activeBot?.username ?? "this bot";
+
     setFullReloading(true);
-    const n = bots.length;
-    const errors: string[] = [];
-    let finishedLoad = false;
+    let finishedOk = false;
+    setFetchBanner({
+      title: `Syncing ${label} with Discord…`,
+      mode: "indeterminate",
+    });
     try {
-      for (let i = 0; i < bots.length; i++) {
-        const b = bots[i];
-        const label = b.displayName ?? b.username ?? "Bot";
-        setFetchBanner({
-          title: `Discord sync: ${label} (${i + 1} of ${n})`,
-          mode: "indeterminate",
-        });
-        const fetchOpts = { timeoutMs: 180_000, quietLog: true } as const;
-        let res = await apiFetch(
-          `/api/bots/${b.id}/guilds/sync`,
-          { method: "POST" },
-          fetchOpts
+      const sync = await syncGuilds(activeBotId);
+      if (!sync.ok) {
+        window.alert(
+          sync.error ??
+            "Could not sync from Discord. If you see 502 in the network tab, check nginx proxy_read_timeout on /adzz-api/ and that the API is running."
         );
-        if (!res.ok) {
-          await new Promise((r) => setTimeout(r, 3000));
-          res = await apiFetch(
-            `/api/bots/${b.id}/guilds/sync`,
-            { method: "POST" },
-            fetchOpts
-          );
-        }
-        if (!res.ok) {
-          const data = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          errors.push(
-            `${label}: ${data.error ?? `HTTP ${res.status}`}`
-          );
-          continue;
-        }
+        return;
       }
       setFetchBanner({
-        title: "Refreshing server list, campaign, and links…",
+        title: "Loading servers…",
         mode: "determinate",
         ease: {
-          min: Math.max(62, Math.min(88, syncBarProgressRef.current - 1)),
-          max: 97,
+          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
+          max: 72,
         },
       });
       await loadGuilds();
+      setFetchBanner({
+        title: "Saving campaign & links…",
+        mode: "determinate",
+        ease: {
+          min: Math.max(62, Math.min(78, syncBarProgressRef.current)),
+          max: 94,
+        },
+      });
       await fetchAdCampaign();
       await fetchDiscordConnectionStatus();
       await refreshServerUiLinks();
-      finishedLoad = true;
-      if (errors.length) {
-        const ok = n - errors.length;
-        window.alert(
-          ok > 0
-            ? `${ok} of ${n} bot(s) synced successfully. These failed:\n\n${errors.join("\n\n")}`
-            : `Could not sync any bot:\n\n${errors.join("\n\n")}`
-        );
-      }
+      finishedOk = true;
     } finally {
-      syncBarStopRef.current = true;
-      if (syncAnimFrameRef.current != null) {
-        cancelAnimationFrame(syncAnimFrameRef.current);
-        syncAnimFrameRef.current = null;
-      }
-      if (finishedLoad) {
-        setSyncBarPercent(100);
-        syncBarProgressRef.current = 100;
-        await new Promise((r) => setTimeout(r, 160));
-      }
-      setFetchBanner(null);
-      setSyncBarPercent(0);
-      syncBarProgressRef.current = 0;
-      syncBarStopRef.current = false;
+      await resetFetchBannerAfterRun(finishedOk);
       setFullReloading(false);
     }
   }, [
+    activeBotId,
     bots,
+    syncGuilds,
     loadGuilds,
     fetchAdCampaign,
     fetchDiscordConnectionStatus,
     refreshServerUiLinks,
+    resetFetchBannerAfterRun,
   ]);
 
   const onRefreshPfp = useCallback(async () => {
@@ -1643,12 +1627,12 @@ export function ServersView() {
           <button
             type="button"
             className={styles.btnSecondary}
-            onClick={() => void onReloadAllServersAndData()}
-            disabled={syncing || fullReloading || !bots.length}
-            title="Re-fetch server & channel lists from Discord for every bot, then reload campaign data. Use this if servers or channel counts look empty after clearing cache."
+            onClick={() => void onReloadActiveBotServersAndData()}
+            disabled={syncing || fullReloading || !bots.length || !activeBotId}
+            title="For the bot selected in the menu: sync servers/channels from Discord, then reload this page’s server list, campaign data, and saved channel links."
           >
             <Building2 size={16} strokeWidth={2} />
-            {fullReloading ? "Reloading servers…" : "Reload servers & data"}
+            {fullReloading ? "Loading & saving…" : "Reload this bot’s data"}
           </button>
           <button
             type="button"
@@ -1765,7 +1749,7 @@ export function ServersView() {
         {filteredServers.length === 0 ? (
           <p className={styles.pageLead}>
             No servers in cache yet. Add a bot and use{" "}
-            <strong>Reload servers &amp; data</strong> or{" "}
+            <strong>Reload this bot&apos;s data</strong> or{" "}
             <strong>Refresh from Discord</strong>, or finish the add-bot wizard
             (it syncs automatically).
           </p>
