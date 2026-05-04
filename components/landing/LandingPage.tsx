@@ -407,6 +407,13 @@ export function LandingPage() {
         <footer className={styles.footer}>
           <span>© {new Date().getFullYear()} Adzz</span>
           <div style={{ display: "flex", gap: "1.25rem", flexWrap: "wrap" }}>
+            <a
+              href="https://discord.gg/adzz"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Support server
+            </a>
             <Link href="/auth/login">Sign in</Link>
             <Link href="/auth/signup">Sign up</Link>
           </div>

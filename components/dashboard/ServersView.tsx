@@ -31,6 +31,16 @@ import {
 import { FixBotModal } from "./FixBotModal";
 import styles from "./servers.module.css";
 
+/** Poll GET guilds while POST /guilds/sync runs so partial backend writes show up in the UI. */
+function startGuildListPolling(
+  load: () => Promise<unknown>,
+  intervalMs: number
+): () => void {
+  void load();
+  const id = window.setInterval(() => void load(), intervalMs);
+  return () => window.clearInterval(id);
+}
+
 /** Keep Discord snowflakes as strings end-to-end (avoid Number() precision loss). */
 function discordId(v: unknown): string {
   if (v == null) return "";
@@ -1359,8 +1369,10 @@ export function ServersView() {
       title: "Syncing server & channel list with Discord…",
       mode: "indeterminate",
     });
+    const stopGuildPoll = startGuildListPolling(loadGuilds, 800);
     try {
       const sync = await syncGuilds(activeBotId);
+      stopGuildPoll();
       if (!sync.ok) {
         window.alert(
           sync.error ??
@@ -1368,20 +1380,12 @@ export function ServersView() {
         );
         return;
       }
-      setFetchBanner({
-        title: "Loading servers…",
-        mode: "determinate",
-        ease: {
-          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
-          max: 72,
-        },
-      });
       await loadGuilds();
       setFetchBanner({
         title: "Saving campaign & connection…",
         mode: "determinate",
         ease: {
-          min: Math.max(62, Math.min(78, syncBarProgressRef.current)),
+          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
           max: 94,
         },
       });
@@ -1390,6 +1394,7 @@ export function ServersView() {
       await refreshServerUiLinks();
       finishedOk = true;
     } finally {
+      stopGuildPoll();
       await resetFetchBannerAfterRun(finishedOk);
     }
   };
@@ -1406,8 +1411,10 @@ export function ServersView() {
       title: `Syncing ${label} with Discord…`,
       mode: "indeterminate",
     });
+    const stopGuildPoll = startGuildListPolling(loadGuilds, 800);
     try {
       const sync = await syncGuilds(activeBotId);
+      stopGuildPoll();
       if (!sync.ok) {
         window.alert(
           sync.error ??
@@ -1415,20 +1422,12 @@ export function ServersView() {
         );
         return;
       }
-      setFetchBanner({
-        title: "Loading servers…",
-        mode: "determinate",
-        ease: {
-          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
-          max: 72,
-        },
-      });
       await loadGuilds();
       setFetchBanner({
         title: "Saving campaign & links…",
         mode: "determinate",
         ease: {
-          min: Math.max(62, Math.min(78, syncBarProgressRef.current)),
+          min: Math.max(40, Math.min(58, syncBarProgressRef.current - 1)),
           max: 94,
         },
       });
@@ -1437,6 +1436,7 @@ export function ServersView() {
       await refreshServerUiLinks();
       finishedOk = true;
     } finally {
+      stopGuildPoll();
       await resetFetchBannerAfterRun(finishedOk);
       setFullReloading(false);
     }

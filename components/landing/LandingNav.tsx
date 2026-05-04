@@ -87,6 +87,15 @@ export function LandingNav({ current = null }: { current?: LandingNavCurrent }) 
         <a className={styles.navQuiet} href="/#pricing" onClick={close}>
           Pricing
         </a>
+        <a
+          className={styles.navQuiet}
+          href="https://discord.gg/adzz"
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={close}
+        >
+          Support
+        </a>
         <Link
           href="/auth/login"
           className={`${styles.navGhost} ${current === "login" ? styles.navLinkActive : ""}`}

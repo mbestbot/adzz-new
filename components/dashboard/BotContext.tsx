@@ -14,6 +14,36 @@ import { useAuth } from "@/components/auth/AuthContext";
 
 const ACTIVE_BOT_KEY = "adzz_active_bot";
 
+/** Poll GET /guilds until server reports `guildSyncInProgress` is not true (202 async sync). */
+async function waitUntilGuildSyncSettles(
+  botId: string,
+  maxWaitMs: number
+): Promise<{ ok: true } | { ok: false; error?: string }> {
+  const start = Date.now();
+  await new Promise((r) => setTimeout(r, 400));
+  while (Date.now() - start < maxWaitMs) {
+    const gRes = await apiFetch(
+      `/api/bots/${botId}/guilds`,
+      {},
+      { timeoutMs: 35_000, quietLog: true }
+    );
+    if (gRes.ok) {
+      const body = (await gRes.json().catch(() => ({}))) as {
+        guildSyncInProgress?: boolean;
+      };
+      if (body.guildSyncInProgress !== true) {
+        return { ok: true };
+      }
+    }
+    await new Promise((r) => setTimeout(r, 800));
+  }
+  return {
+    ok: false,
+    error:
+      "Discord sync is still running on the server. Refresh in a moment to load the full server list.",
+  };
+}
+
 export type BotSummary = {
   id: string;
   discordUserId: string;
@@ -201,20 +231,26 @@ export function BotProvider({ children }: { children: ReactNode }) {
 
   const syncGuilds = useCallback(async (botId: string) => {
     setSyncing(true);
-    const fetchOpts = { timeoutMs: 300_000, quietLog: true } as const;
+    const postOpts = { timeoutMs: 90_000, quietLog: true } as const;
     try {
       let res = await apiFetch(
         `/api/bots/${botId}/guilds/sync`,
         { method: "POST" },
-        fetchOpts
+        postOpts
       );
+      if (res.status === 202) {
+        return await waitUntilGuildSyncSettles(botId, 900_000);
+      }
       if (!res.ok) {
         await new Promise((r) => setTimeout(r, 3000));
         res = await apiFetch(
           `/api/bots/${botId}/guilds/sync`,
           { method: "POST" },
-          fetchOpts
+          postOpts
         );
+      }
+      if (res.status === 202) {
+        return await waitUntilGuildSyncSettles(botId, 900_000);
       }
       if (res.ok) return { ok: true as const };
       const data = (await res.json().catch(() => ({}))) as { error?: string };
