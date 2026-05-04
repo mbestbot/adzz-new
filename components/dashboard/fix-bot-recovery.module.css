@@ -1,0 +1,170 @@
+.section {
+  margin-bottom: 1.15rem;
+}
+
+.sectionTitle {
+  margin: 0 0 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dash-muted);
+}
+
+.recoveryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.recoveryRow:last-child {
+  margin-bottom: 0;
+}
+
+.recoveryInput {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.recoveryActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.btnMini {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.38rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2);
+  color: var(--dash-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.btnMini:hover:not(:disabled) {
+  background: var(--dash-accent-softer);
+  border-color: var(--dash-border-strong);
+  color: var(--dash-text);
+}
+
+.btnMini:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.scriptRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.scriptRowFirst {
+  margin-top: 0;
+}
+
+.hintWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.hintBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.2);
+  color: var(--dash-accent-mid);
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.hintBtn:hover,
+.hintBtn:focus-visible {
+  background: rgba(124, 58, 237, 0.35);
+  color: #faf5ff;
+}
+
+.hintPopover {
+  position: absolute;
+  z-index: 50;
+  left: 0;
+  top: calc(100% + 4px);
+  width: min(22rem, 85vw);
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-border-strong);
+  background: var(--dash-surface);
+  box-shadow: var(--dash-shadow-lg);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--dash-text-secondary);
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.12s ease,
+    visibility 0.12s ease;
+}
+
+.hintWrap:hover .hintPopover,
+.hintWrap:focus-within .hintPopover {
+  opacity: 1;
+  visibility: visible;
+}
+
+.tokenPanel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--dash-border);
+}
+
+.tokenPanel summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--dash-text-secondary);
+  user-select: none;
+}
+
+.tokenPanel summary:hover {
+  color: var(--dash-text);
+}
+
+.muted {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--dash-muted);
+  line-height: 1.45;
+}
+
+@keyframes hintSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.iconSpin {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.35rem;
+  animation: hintSpin 0.85s linear infinite;
+}
