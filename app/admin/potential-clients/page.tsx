@@ -6,10 +6,8 @@ export default function AdminPotentialClientsPage() {
     <>
       <h1 className={shellStyles.mainTitle}>Potential clients</h1>
       <p className={shellStyles.mainLead}>
-        Every unique Discord server seen across cached bot guild lists (deduped by
-        server ID). Channel names and the &quot;Open&quot; link are rebuilt from the
-        latest cache whenever you load this page, so they stay in sync after users
-        refresh from Discord.
+        One small card per Discord server (deduped). Reload the page to refresh
+        names, icons, member counts, and join links from the latest cache.
       </p>
       <PotentialClientsView />
     </>

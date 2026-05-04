@@ -32,9 +32,17 @@ type ContactMutationResponse = PotentialClientsResponse & {
   contacted: boolean;
 };
 
-function formatDate(ms: number | null) {
-  if (ms == null || !Number.isFinite(ms)) return "—";
-  return new Date(ms).toLocaleString();
+function guildIconUrl(guildId: string, icon: string | null): string | null {
+  if (!icon) return null;
+  const ext = icon.startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/icons/${guildId}/${icon}.${ext}?size=128`;
+}
+
+function guildInitial(name: string): string {
+  const t = name.trim();
+  if (!t) return "?";
+  const c = t[0];
+  return /[a-z]/i.test(c) ? c.toUpperCase() : c;
 }
 
 export function PotentialClientsView() {
@@ -61,7 +69,7 @@ export function PotentialClientsView() {
     };
   }, [load]);
 
-  const setContacted = useCallback(
+  const setApproached = useCallback(
     async (guildId: string, contacted: boolean) => {
       setBusyId(guildId);
       setError(null);
@@ -85,125 +93,85 @@ export function PotentialClientsView() {
   }
 
   if (!rows) {
-    return <p className={botStyles.muted}>Loading potential clients…</p>;
+    return <p className={botStyles.muted}>Loading…</p>;
+  }
+
+  if (rows.length === 0) {
+    return (
+      <p className={styles.empty}>
+        No servers in cache yet. After bots sync guilds, cards show up here
+        (one card per Discord server).
+      </p>
+    );
   }
 
   return (
-    <div className={botStyles.tableWrap}>
-      <table className={botStyles.table}>
-        <thead>
-          <tr>
-            <th className={botStyles.th}>Server</th>
-            <th className={botStyles.th}>Members</th>
-            <th className={botStyles.th}>Open in Discord</th>
-            <th className={botStyles.th}>Channels</th>
-            <th className={botStyles.th}>Bots</th>
-            <th className={botStyles.th}>Owner emails</th>
-            <th className={botStyles.th}>Outreach</th>
-            <th className={botStyles.th} aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td className={botStyles.td} colSpan={8}>
-                No guilds in cache yet. When user bots finish syncing servers,
-                deduplicated rows appear here.
-              </td>
-            </tr>
-          ) : (
-            rows.map((r) => (
-              <tr key={r.discordGuildId}>
-                <td className={botStyles.td}>
-                  <strong style={{ color: "var(--dash-text)" }}>{r.name}</strong>
-                  <div className={botStyles.mono}>{r.discordGuildId}</div>
-                  <div className={botStyles.muted} style={{ marginTop: "0.2rem" }}>
-                    Cache updated {formatDate(r.updatedAt)}
-                  </div>
-                </td>
-                <td className={botStyles.td}>
-                  {r.approximateMemberCount.toLocaleString()}
-                </td>
-                <td className={botStyles.td}>
-                  {r.openInDiscordUrl ? (
-                    <a
-                      className={styles.linkBtn}
-                      href={r.openInDiscordUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open
-                      <ExternalLink size={14} strokeWidth={2} aria-hidden />
-                    </a>
-                  ) : (
-                    <span className={botStyles.muted}>No text channels</span>
-                  )}
-                </td>
-                <td className={botStyles.td}>
-                  <div className={botStyles.muted} style={{ marginBottom: "0.25rem" }}>
-                    {r.channelCount} total
-                  </div>
-                  {r.channelsPreview.length ? (
-                    <ul className={styles.channelList}>
-                      {r.channelsPreview.map((c) => (
-                        <li key={c.id}>
-                          #{c.name}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <span className={botStyles.muted}>—</span>
-                  )}
-                  {r.channelsTruncated ? (
-                    <div className={botStyles.muted} style={{ marginTop: "0.2rem" }}>
-                      …more not shown
-                    </div>
-                  ) : null}
-                </td>
-                <td className={botStyles.td}>
-                  {r.botLabels.length ? r.botLabels.join(", ") : "—"}
-                </td>
-                <td className={`${botStyles.td} ${botStyles.mono}`}>
-                  {r.ownerEmails.length ? r.ownerEmails.join(", ") : "—"}
-                </td>
-                <td className={botStyles.td}>
-                  {r.contacted ? (
-                    <span>
-                      <span className={styles.badge}>Contacted</span>
-                      <div className={botStyles.muted} style={{ marginTop: "0.25rem" }}>
-                        {formatDate(r.contactedAt)}
-                      </div>
-                    </span>
-                  ) : (
-                    <span className={botStyles.muted}>Not yet</span>
-                  )}
-                </td>
-                <td className={botStyles.td}>
-                  {r.contacted ? (
-                    <button
-                      type="button"
-                      className={styles.actionBtn}
-                      disabled={busyId === r.discordGuildId}
-                      onClick={() => void setContacted(r.discordGuildId, false)}
-                    >
-                      Undo
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`${styles.actionBtn} ${styles.actionBtnDone}`}
-                      disabled={busyId === r.discordGuildId}
-                      onClick={() => void setContacted(r.discordGuildId, true)}
-                    >
-                      Mark contacted
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+    <div className={styles.grid}>
+      {rows.map((r) => {
+        const iconSrc = guildIconUrl(r.discordGuildId, r.icon);
+        const busy = busyId === r.discordGuildId;
+        return (
+          <article
+            key={r.discordGuildId}
+            className={`${styles.card} ${r.contacted ? styles.cardApproached : ""}`}
+          >
+            <div className={styles.iconWrap}>
+              {iconSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  className={styles.icon}
+                  src={iconSrc}
+                  alt=""
+                  width={52}
+                  height={52}
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <div className={styles.iconFallback} aria-hidden>
+                  {guildInitial(r.name)}
+                </div>
+              )}
+            </div>
+            <h3 className={styles.serverName}>{r.name}</h3>
+            <p className={styles.members}>
+              {r.approximateMemberCount.toLocaleString()} members
+            </p>
+            {r.openInDiscordUrl ? (
+              <a
+                className={styles.joinLink}
+                href={r.openInDiscordUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Join
+                <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
+              </a>
+            ) : (
+              <span className={styles.joinMuted}>No link</span>
+            )}
+            {r.contacted ? (
+              <button
+                type="button"
+                className={styles.actionBtn}
+                disabled={busy}
+                onClick={() => void setApproached(r.discordGuildId, false)}
+              >
+                Undo
+              </button>
+            ) : (
+              <button
+                type="button"
+                className={`${styles.actionBtn} ${styles.actionBtnPrimary}`}
+                disabled={busy}
+                onClick={() => void setApproached(r.discordGuildId, true)}
+              >
+                Mark approached
+              </button>
+            )}
+          </article>
+        );
+      })}
     </div>
   );
 }
