@@ -245,7 +245,7 @@ export function FixBotModal({
           </button>
         </header>
 
-        <div className={styles.body}>
+        <div className={`${styles.body} ${r.recoveryScrollBody}`}>
           {flash ? (
             <p className={r.muted} role="status" style={{ marginBottom: "0.65rem" }}>
               {flash}
