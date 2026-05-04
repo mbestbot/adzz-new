@@ -167,9 +167,11 @@ export function BotProvider({ children }: { children: ReactNode }) {
   const syncGuilds = useCallback(async (botId: string) => {
     setSyncing(true);
     try {
-      const res = await apiFetch(`/api/bots/${botId}/guilds/sync`, {
-        method: "POST",
-      });
+      const res = await apiFetch(
+        `/api/bots/${botId}/guilds/sync`,
+        { method: "POST" },
+        { timeoutMs: 120_000 }
+      );
       if (res.ok) return { ok: true as const };
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       return { ok: false as const, error: data.error };

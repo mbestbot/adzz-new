@@ -736,11 +736,15 @@ export function ServersView() {
       for (const channelId of toProbe) {
         if (cancelled) break;
         slowmodeProbeAttemptedRef.current.add(channelId);
-        const res = await apiFetch("/api/ad-campaign/probe-channel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ botId: activeBotId, channelId }),
-        });
+        const res = await apiFetch(
+          "/api/ad-campaign/probe-channel",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ botId: activeBotId, channelId }),
+          },
+          { timeoutMs: 45_000 }
+        );
         if (!cancelled && res.ok) {
           await fetchAdCampaign();
         }
@@ -790,11 +794,15 @@ export function ServersView() {
           }
         }
         for (const channelId of toProbe) {
-          const res = await apiFetch("/api/ad-campaign/probe-channel", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ botId: activeBotId, channelId }),
-          });
+          const res = await apiFetch(
+            "/api/ad-campaign/probe-channel",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ botId: activeBotId, channelId }),
+            },
+            { timeoutMs: 45_000 }
+          );
           if (res.ok) await fetchAdCampaign();
           await new Promise((r) => setTimeout(r, 500));
         }
@@ -1317,8 +1325,7 @@ export function ServersView() {
     let finishedOk = false;
     setFetchBanner({
       title: "Syncing server & channel list with Discord…",
-      mode: "determinate",
-      ease: { min: 0, max: 88 },
+      mode: "indeterminate",
     });
     try {
       const sync = await syncGuilds(activeBotId);
@@ -1371,20 +1378,15 @@ export function ServersView() {
       for (let i = 0; i < bots.length; i++) {
         const b = bots[i];
         const label = b.displayName ?? b.username ?? "Bot";
-        const segmentMin = (i / Math.max(n, 1)) * 74;
-        const segmentMax =
-          ((i + 1) / Math.max(n, 1)) * 92 - (n === 1 ? 4 : 0.4);
         setFetchBanner({
           title: `Discord sync: ${label} (${i + 1} of ${n})`,
-          mode: "determinate",
-          ease: {
-            min: segmentMin,
-            max: Math.max(segmentMin + 10, segmentMax),
-          },
+          mode: "indeterminate",
         });
-        const res = await apiFetch(`/api/bots/${b.id}/guilds/sync`, {
-          method: "POST",
-        });
+        const res = await apiFetch(
+          `/api/bots/${b.id}/guilds/sync`,
+          { method: "POST" },
+          { timeoutMs: 120_000 }
+        );
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as {
             error?: string;
