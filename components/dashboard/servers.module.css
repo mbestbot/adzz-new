@@ -236,7 +236,7 @@
     var(--dash-accent-deep) 0%,
     var(--dash-accent-mid) 100%
   );
-  transition: width 0.28s ease;
+  transition: width 0.1s ease-out;
 }
 
 .syncFetchTrackIndeterminate {
@@ -899,6 +899,86 @@
   height: 1rem;
   accent-color: var(--dash-accent-mid);
   cursor: pointer;
+}
+
+.addChannelToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.addChannelSearchWrap {
+  flex: 1 1 10rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2);
+}
+
+.addChannelSearchIcon {
+  flex-shrink: 0;
+  color: var(--dash-muted);
+}
+
+.addChannelSearchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--dash-text);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  outline: none;
+}
+
+.addChannelSearchInput::placeholder {
+  color: var(--dash-muted);
+}
+
+.addChannelRefreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  padding: 0.42rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-3);
+  color: var(--dash-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.addChannelRefreshBtn:hover:not(:disabled) {
+  background: var(--dash-accent-softer);
+  border-color: var(--dash-border-strong);
+  color: var(--dash-text);
+}
+
+.addChannelRefreshBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addChannelRefreshSpin {
+  animation: addChannelRefreshSpin 0.75s linear infinite;
+}
+
+@keyframes addChannelRefreshSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .addChannelPickList {

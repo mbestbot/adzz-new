@@ -20,18 +20,7 @@ import {
 } from "@/components/dashboard/BotContext";
 import styles from "./messages.module.css";
 
-const DEFAULT_MESSAGE = `**Your headline here**
-
-Short value prop — what you offer and why it matters.
-
-> Optional callout or quote block.
-
----
-
-**CTA:** Link or next step for readers.`;
-
 const INTERVAL_OPTIONS = [
-  "5 Second(s)",
   "5 Minute(s)",
   "30 Minute(s)",
   "1 Hour(s)",
@@ -121,7 +110,7 @@ function hydrateCampaignFromApi(
       message:
         typeof api.message === "string" && api.message.trim()
           ? api.message
-          : DEFAULT_MESSAGE,
+          : "",
       allBotsSelected: true,
       selectedBotIds: [],
       allServersSelected: true,
@@ -151,7 +140,7 @@ function hydrateCampaignFromApi(
     message:
       typeof api.message === "string" && api.message.trim()
         ? api.message
-        : DEFAULT_MESSAGE,
+        : "",
     allBotsSelected: allBots,
     selectedBotIds: allBots ? [] : [...botIdSet],
     allServersSelected: false,
@@ -174,7 +163,7 @@ function hydrateAdPoolFromApi(
   const messages =
     Array.isArray(api.messages) && api.messages.length > 0
       ? api.messages.map((m) => String(m ?? ""))
-      : [DEFAULT_MESSAGE];
+      : ["", "", ""];
   if (targets.length === 0) {
     return {
       messages,
@@ -494,7 +483,7 @@ export function MessagesView() {
     null
   );
   const [burstBotId, setBurstBotId] = useState("");
-  const [burstMessage, setBurstMessage] = useState(DEFAULT_MESSAGE);
+  const [burstMessage, setBurstMessage] = useState("");
   const [burstQuota, setBurstQuota] = useState(10);
   const [burstInterval, setBurstInterval] = useState("1 Hour(s)");
   const [burstBusy, setBurstBusy] = useState(false);
@@ -504,7 +493,7 @@ export function MessagesView() {
   >(null);
 
   const [adPoolDraft, setAdPoolDraft] = useState<AdPoolLocal>(() => ({
-    messages: [DEFAULT_MESSAGE, "", ""],
+    messages: ["", "", ""],
     allBotsSelected: true,
     selectedBotIds: [],
     allServersSelected: true,
@@ -860,7 +849,7 @@ export function MessagesView() {
         c.id === id
           ? {
               ...c,
-              message: DEFAULT_MESSAGE,
+              message: "",
               allBotsSelected: true,
               selectedBotIds: [],
               allServersSelected: true,
@@ -1907,8 +1896,7 @@ export function MessagesView() {
             <p className={styles.previewCaption}>Discord · live preview</p>
             <DiscordMessageLivePreview
               text={
-                adPoolDraft.messages.find((x) => String(x).trim()) ??
-                DEFAULT_MESSAGE
+                adPoolDraft.messages.find((x) => String(x).trim()) ?? ""
               }
               bot={
                 bots.find((b) => b.id === effectivePoolBots(adPoolDraft, bots)[0]) ??

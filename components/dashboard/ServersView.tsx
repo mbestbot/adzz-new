@@ -240,7 +240,10 @@ type FetchBannerState =
   | {
       title: string;
       mode: "determinate" | "indeterminate";
+      /** Static bar (no animation) when ease is omitted */
       percent?: number;
+      /** Eased bar: animates quickly then slows toward max while work runs */
+      ease?: { min: number; max: number };
     };
 
 function ChannelActionsMenu({
@@ -393,6 +396,10 @@ export function ServersView() {
   const [refreshingPfp, setRefreshingPfp] = useState(false);
   const [fullReloading, setFullReloading] = useState(false);
   const [fetchBanner, setFetchBanner] = useState<FetchBannerState>(null);
+  const [syncBarPercent, setSyncBarPercent] = useState(0);
+  const syncBarProgressRef = useRef(0);
+  const syncBarStopRef = useRef(false);
+  const syncAnimFrameRef = useRef<number | null>(null);
   const [addChannelForGuildId, setAddChannelForGuildId] = useState<
     string | null
   >(null);
@@ -1228,11 +1235,90 @@ export function ServersView() {
     [activeBotId, fetchAdCampaign]
   );
 
+  useEffect(() => {
+    if (!fetchBanner) {
+      syncBarStopRef.current = true;
+      if (syncAnimFrameRef.current != null) {
+        cancelAnimationFrame(syncAnimFrameRef.current);
+        syncAnimFrameRef.current = null;
+      }
+      syncBarProgressRef.current = 0;
+      setSyncBarPercent(0);
+      return;
+    }
+
+    if (fetchBanner.mode === "indeterminate" && !fetchBanner.ease) {
+      syncBarStopRef.current = true;
+      if (syncAnimFrameRef.current != null) {
+        cancelAnimationFrame(syncAnimFrameRef.current);
+        syncAnimFrameRef.current = null;
+      }
+      setSyncBarPercent(0);
+      return;
+    }
+
+    if (fetchBanner.mode === "determinate" && fetchBanner.ease) {
+      syncBarStopRef.current = false;
+      const { min: easeMin, max: easeMax } = fetchBanner.ease;
+      syncBarProgressRef.current = Math.max(
+        easeMin,
+        Math.min(syncBarProgressRef.current, easeMax)
+      );
+      let last = performance.now();
+
+      const tick = (now: number) => {
+        if (syncBarStopRef.current) return;
+        const dt = Math.min(48, now - last);
+        last = now;
+        let p = syncBarProgressRef.current;
+        p = Math.max(easeMin, p);
+        const span = easeMax - p;
+        const range = Math.max(1e-6, easeMax - easeMin);
+        const t = (p - easeMin) / range;
+        const slowFactor = (1 - t) * (1 - t);
+        const stepMul = 0.038 + 0.14 * slowFactor;
+        const delta = Math.max(0.06, span * stepMul) * (dt / 16.67);
+        p = Math.min(easeMax - 0.12, p + delta);
+        syncBarProgressRef.current = p;
+        setSyncBarPercent(p);
+        syncAnimFrameRef.current = requestAnimationFrame(tick);
+      };
+      syncAnimFrameRef.current = requestAnimationFrame(tick);
+      return () => {
+        syncBarStopRef.current = true;
+        if (syncAnimFrameRef.current != null) {
+          cancelAnimationFrame(syncAnimFrameRef.current);
+          syncAnimFrameRef.current = null;
+        }
+      };
+    } else if (
+      fetchBanner.mode === "determinate" &&
+      fetchBanner.percent != null
+    ) {
+      syncBarStopRef.current = true;
+      if (syncAnimFrameRef.current != null) {
+        cancelAnimationFrame(syncAnimFrameRef.current);
+        syncAnimFrameRef.current = null;
+      }
+      const v = fetchBanner.percent;
+      syncBarProgressRef.current = v;
+      setSyncBarPercent(v);
+    }
+  }, [
+    fetchBanner?.title,
+    fetchBanner?.mode,
+    fetchBanner?.percent,
+    fetchBanner?.ease?.min,
+    fetchBanner?.ease?.max,
+  ]);
+
   const onRefreshDiscord = async () => {
     if (!activeBotId) return;
+    let finishedOk = false;
     setFetchBanner({
       title: "Syncing server & channel list with Discord…",
-      mode: "indeterminate",
+      mode: "determinate",
+      ease: { min: 0, max: 88 },
     });
     try {
       const sync = await syncGuilds(activeBotId);
@@ -1245,14 +1331,32 @@ export function ServersView() {
       }
       setFetchBanner({
         title: "Loading servers, campaign targets, and connection status…",
-        mode: "indeterminate",
+        mode: "determinate",
+        ease: {
+          min: Math.max(58, Math.min(84, syncBarProgressRef.current - 1)),
+          max: 97,
+        },
       });
       await loadGuilds();
       await fetchAdCampaign();
       await fetchDiscordConnectionStatus();
       await refreshServerUiLinks();
+      finishedOk = true;
     } finally {
+      syncBarStopRef.current = true;
+      if (syncAnimFrameRef.current != null) {
+        cancelAnimationFrame(syncAnimFrameRef.current);
+        syncAnimFrameRef.current = null;
+      }
+      if (finishedOk) {
+        setSyncBarPercent(100);
+        syncBarProgressRef.current = 100;
+        await new Promise((r) => setTimeout(r, 160));
+      }
       setFetchBanner(null);
+      setSyncBarPercent(0);
+      syncBarProgressRef.current = 0;
+      syncBarStopRef.current = false;
     }
   };
 
@@ -1262,17 +1366,21 @@ export function ServersView() {
     setFullReloading(true);
     const n = bots.length;
     const errors: string[] = [];
+    let finishedLoad = false;
     try {
       for (let i = 0; i < bots.length; i++) {
         const b = bots[i];
         const label = b.displayName ?? b.username ?? "Bot";
+        const segmentMin = (i / Math.max(n, 1)) * 74;
+        const segmentMax =
+          ((i + 1) / Math.max(n, 1)) * 92 - (n === 1 ? 4 : 0.4);
         setFetchBanner({
           title: `Discord sync: ${label} (${i + 1} of ${n})`,
           mode: "determinate",
-          percent: Math.min(
-            90,
-            Math.round(((i + 0.35) / Math.max(n, 1)) * 92)
-          ),
+          ease: {
+            min: segmentMin,
+            max: Math.max(segmentMin + 10, segmentMax),
+          },
         });
         const res = await apiFetch(`/api/bots/${b.id}/guilds/sync`, {
           method: "POST",
@@ -1289,12 +1397,17 @@ export function ServersView() {
       }
       setFetchBanner({
         title: "Refreshing server list, campaign, and links…",
-        mode: "indeterminate",
+        mode: "determinate",
+        ease: {
+          min: Math.max(62, Math.min(88, syncBarProgressRef.current - 1)),
+          max: 97,
+        },
       });
       await loadGuilds();
       await fetchAdCampaign();
       await fetchDiscordConnectionStatus();
       await refreshServerUiLinks();
+      finishedLoad = true;
       if (errors.length) {
         const ok = n - errors.length;
         window.alert(
@@ -1304,7 +1417,20 @@ export function ServersView() {
         );
       }
     } finally {
+      syncBarStopRef.current = true;
+      if (syncAnimFrameRef.current != null) {
+        cancelAnimationFrame(syncAnimFrameRef.current);
+        syncAnimFrameRef.current = null;
+      }
+      if (finishedLoad) {
+        setSyncBarPercent(100);
+        syncBarProgressRef.current = 100;
+        await new Promise((r) => setTimeout(r, 160));
+      }
       setFetchBanner(null);
+      setSyncBarPercent(0);
+      syncBarProgressRef.current = 0;
+      syncBarStopRef.current = false;
       setFullReloading(false);
     }
   }, [
@@ -1541,16 +1667,19 @@ export function ServersView() {
           <p className={styles.syncFetchBannerText}>{fetchBanner.title}</p>
           <div
             className={
-              fetchBanner.mode === "indeterminate"
+              fetchBanner.mode === "indeterminate" && !fetchBanner.ease
                 ? styles.syncFetchTrackIndeterminate
                 : styles.syncFetchTrack
             }
             aria-hidden
           >
-            {fetchBanner.mode === "determinate" ? (
+            {fetchBanner.mode === "determinate" &&
+            (fetchBanner.ease != null || fetchBanner.percent != null) ? (
               <div
                 className={styles.syncFetchFill}
-                style={{ width: `${Math.max(4, fetchBanner.percent ?? 0)}%` }}
+                style={{
+                  width: `${Math.max(3, Math.min(100, Math.round(syncBarPercent)))}%`,
+                }}
               />
             ) : null}
           </div>
@@ -1576,7 +1705,7 @@ export function ServersView() {
         onApply={(mode) => applyAutoConfigure(mode)}
       />
 
-      {addChannelForGuildId ? (
+      {addChannelForGuildId && activeBotId ? (
         <AddChannelModal
           open={Boolean(addChannelForGuildId)}
           onClose={() => setAddChannelForGuildId(null)}
@@ -1584,6 +1713,8 @@ export function ServersView() {
             rawGuilds.find((g) => g.id === addChannelForGuildId)?.name ??
             "Server"
           }
+          guildId={addChannelForGuildId}
+          botId={activeBotId}
           channels={
             rawGuilds.find((g) => g.id === addChannelForGuildId)?.channels ??
             []
@@ -1592,6 +1723,15 @@ export function ServersView() {
             new Set((linkedByGuild[addChannelForGuildId] ?? []).map((c) => c.id))
           }
           onPick={(c) => addLinkedChannel(addChannelForGuildId, c)}
+          onChannelsUpdated={(nextChannels) => {
+            setRawGuilds((prev) =>
+              prev.map((g) =>
+                g.id === addChannelForGuildId
+                  ? { ...g, channels: nextChannels, updatedAt: Date.now() }
+                  : g
+              )
+            );
+          }}
         />
       ) : null}
 

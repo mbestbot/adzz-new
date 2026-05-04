@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { RefreshCw, Search, X } from "lucide-react";
+import { apiFetch } from "@/lib/api";
 import styles from "./add-bot-modal.module.css";
 import s from "./servers.module.css";
 
@@ -43,21 +44,32 @@ type AddChannelModalProps = {
   open: boolean;
   onClose: () => void;
   guildName: string;
+  /** Discord guild (server) snowflake */
+  guildId: string;
+  /** Bot that owns the guild cache row */
+  botId: string;
   channels: ApiChannel[];
   alreadyAddedIds: ReadonlySet<string>;
   onPick: (channel: ApiChannel) => void;
+  /** Called after a successful Discord refresh so parent can update local guild cache */
+  onChannelsUpdated?: (channels: ApiChannel[]) => void;
 };
 
 export function AddChannelModal({
   open,
   onClose,
   guildName,
+  guildId,
+  botId,
   channels,
   alreadyAddedIds,
   onPick,
+  onChannelsUpdated,
 }: AddChannelModalProps) {
   const [mounted, setMounted] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [channelQuery, setChannelQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -72,19 +84,55 @@ export function AddChannelModal({
   }, [open]);
 
   useEffect(() => {
-    if (open) setShowAll(false);
-  }, [open, guildName]);
+    if (open) {
+      setShowAll(false);
+      setChannelQuery("");
+    }
+  }, [open, guildName, guildId]);
 
   const textChannels = useMemo(
     () =>
-      [...channels].filter((c) => c.type === 0).sort((a, b) => a.name.localeCompare(b.name)),
+      [...channels]
+        .filter((c) => c.type === 0)
+        .sort((a, b) => a.name.localeCompare(b.name)),
     [channels]
   );
 
-  const visibleChannels = useMemo(() => {
+  const keywordFiltered = useMemo(() => {
     if (showAll) return textChannels;
     return textChannels.filter((c) => channelNameMatchesAdKeywords(c.name));
   }, [showAll, textChannels]);
+
+  const visibleChannels = useMemo(() => {
+    const q = channelQuery.trim().toLowerCase();
+    if (!q) return keywordFiltered;
+    return keywordFiltered.filter((c) => c.name.toLowerCase().includes(q));
+  }, [channelQuery, keywordFiltered]);
+
+  const onRefreshFromDiscord = async () => {
+    if (!botId || !guildId) return;
+    setRefreshing(true);
+    try {
+      const res = await apiFetch(
+        `/api/bots/${encodeURIComponent(botId)}/guilds/${encodeURIComponent(guildId)}/channels/refresh`,
+        { method: "POST" }
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        channels?: ApiChannel[];
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(
+          data.error ?? `Could not refresh channels from Discord (${res.status})`
+        );
+        return;
+      }
+      const next = data.channels ?? [];
+      onChannelsUpdated?.(next);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   if (!mounted || !open) return null;
 
@@ -101,6 +149,8 @@ export function AddChannelModal({
             <p className={styles.headSub}>
               Suggested names match: Ad, advertisement, ads, discord, selling,
               seller. Turn on <strong>Show all</strong> to pick any text channel.
+              Use <strong>Refresh</strong> to pull the latest channel list from
+              Discord (updates saved cache).
             </p>
           </div>
           <button
@@ -114,21 +164,62 @@ export function AddChannelModal({
         </header>
 
         <div className={styles.body}>
+          <div className={s.addChannelToolbar}>
+            <div className={s.addChannelSearchWrap}>
+              <Search
+                size={16}
+                strokeWidth={2}
+                className={s.addChannelSearchIcon}
+                aria-hidden
+              />
+              <input
+                type="search"
+                className={s.addChannelSearchInput}
+                placeholder="Search channels…"
+                value={channelQuery}
+                onChange={(e) => setChannelQuery(e.target.value)}
+                aria-label="Search channels"
+                autoComplete="off"
+              />
+            </div>
+            <button
+              type="button"
+              className={s.addChannelRefreshBtn}
+              onClick={() => void onRefreshFromDiscord()}
+              disabled={!botId || !guildId || refreshing}
+              title="Fetch latest channels from Discord for this server and update cache"
+            >
+              <RefreshCw
+                size={15}
+                strokeWidth={2}
+                className={refreshing ? s.addChannelRefreshSpin : undefined}
+                aria-hidden
+              />
+              {refreshing ? "Refreshing…" : "Refresh"}
+            </button>
+          </div>
+
           <label className={s.addChannelToggleRow}>
             <input
               type="checkbox"
               className={s.addChannelToggleInput}
               checked={showAll}
               onChange={(e) => setShowAll(e.target.checked)}
+              disabled={refreshing}
             />
             <span>Show all channels</span>
           </label>
 
-          {visibleChannels.length === 0 ? (
+          {keywordFiltered.length === 0 ? (
             <p className={styles.headSub} style={{ marginTop: "0.5rem" }}>
               {showAll
-                ? "No text channels in cache for this server."
-                : "No channels match the keyword filter. Enable “Show all channels” or refresh from Discord."}
+                ? "No text channels in cache for this server. Try Refresh."
+                : "No channels match the keyword filter. Enable “Show all channels” or use Refresh / Refresh from Discord on the Servers page."}
+            </p>
+          ) : visibleChannels.length === 0 ? (
+            <p className={styles.headSub} style={{ marginTop: "0.5rem" }}>
+              No channels match “{channelQuery.trim()}”. Try a different search or
+              turn on Show all channels.
             </p>
           ) : (
             <ul className={s.addChannelPickList} role="listbox" aria-label="Channels">
@@ -140,7 +231,7 @@ export function AddChannelModal({
                       type="button"
                       role="option"
                       className={`${s.addChannelPickItem} ${taken ? s.addChannelPickItemDisabled : ""}`}
-                      disabled={taken}
+                      disabled={taken || refreshing}
                       onClick={() => {
                         if (taken) return;
                         onPick(c);
@@ -160,7 +251,11 @@ export function AddChannelModal({
         </div>
 
         <footer className={styles.footer}>
-          <button type="button" className={styles.backBtn} onClick={onClose}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={onClose}
+          >
             Cancel
           </button>
         </footer>
