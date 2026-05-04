@@ -41,6 +41,27 @@ function startGuildListPolling(
   return () => window.clearInterval(id);
 }
 
+/** Minimal slice of GET /api/messages-state for Servers channel badges. */
+type MessagesStateForServers = {
+  uiMode?: string;
+  adPool?: {
+    messages?: string[];
+    intervalMs?: number;
+    targets?: {
+      botId: string;
+      channelId: string;
+      paused?: boolean;
+      lastSendError?: string | null;
+      lastSentAt?: number | null;
+      lastSendErrorAt?: number | null;
+      discordSlowmodeSec?: number | null;
+      guildId?: string;
+      discordGuildId?: string;
+      adsSentTotal?: number;
+    }[];
+  } | null;
+};
+
 /** Keep Discord snowflakes as strings end-to-end (avoid Number() precision loss). */
 function discordId(v: unknown): string {
   if (v == null) return "";
@@ -493,12 +514,19 @@ export function ServersView() {
       slowmodeProbeAttemptedRef.current = new Set();
       return;
     }
-    const res = await apiFetch("/api/ad-campaign");
+    const [res, msgRes] = await Promise.all([
+      apiFetch("/api/ad-campaign"),
+      apiFetch("/api/messages-state"),
+    ]);
     if (!res.ok) {
       if (process.env.NODE_ENV === "development") {
         console.warn("[ServersView] /api/ad-campaign failed", res.status);
       }
       return;
+    }
+    let msgState: MessagesStateForServers | null = null;
+    if (msgRes.ok) {
+      msgState = (await msgRes.json()) as MessagesStateForServers;
     }
     const data = (await res.json()) as {
       campaigns?: {
@@ -519,7 +547,12 @@ export function ServersView() {
       }[];
     };
     const campaigns = data.campaigns ?? [];
-    const anyEnabled = campaigns.length > 0;
+    const pool = msgState?.uiMode === "adpool" ? msgState.adPool : null;
+    const poolHasTargets = (pool?.targets?.length ?? 0) > 0;
+    const poolHasMessage =
+      Array.isArray(pool?.messages) &&
+      pool.messages.some((m) => String(m ?? "").trim().length > 0);
+    const anyEnabled = campaigns.length > 0 || poolHasTargets;
     const running = new Set<string>();
     const paused = new Set<string>();
     const listed = new Set<string>();
@@ -532,26 +565,23 @@ export function ServersView() {
     const channelToGuild: Record<string, string> = {};
     let globalMinInterval: number | null = null;
 
-    for (const c of campaigns) {
-      const intervalMs =
-        c?.intervalMs != null ? Number(c.intervalMs) : Number.NaN;
-      const campIntervalSec =
-        Number.isFinite(intervalMs) && intervalMs > 0
-          ? Math.max(1, Math.round(intervalMs / 1000))
-          : null;
-      const campHasMessage = String(c.message ?? "").trim().length > 0;
-      const touchesBot = (c.targets ?? []).some(
-        (t) => discordId(t.botId) === discordId(activeBotId)
-      );
-      if (
-        touchesBot &&
-        campIntervalSec != null &&
-        (globalMinInterval == null || campIntervalSec < globalMinInterval)
-      ) {
-        globalMinInterval = campIntervalSec;
-      }
-
-      for (const t of c.targets ?? []) {
+    const ingestTargetsForBot = (
+      targets: {
+        botId: string;
+        channelId: string;
+        paused?: boolean;
+        lastSendError?: string | null;
+        lastSentAt?: number | null;
+        lastSendErrorAt?: number | null;
+        discordSlowmodeSec?: number | null;
+        guildId?: string;
+        discordGuildId?: string;
+        adsSentTotal?: number;
+      }[],
+      campIntervalSec: number | null,
+      campHasCopy: boolean
+    ) => {
+      for (const t of targets ?? []) {
         if (discordId(t.botId) !== discordId(activeBotId)) continue;
         const chId = discordId(t.channelId);
         if (!chId) continue;
@@ -591,9 +621,7 @@ export function ServersView() {
             : 0;
         channelAdsSent[chId] = Math.max(channelAdsSent[chId] ?? 0, sent);
         const gid = String(
-          t.guildId ??
-            (t as { discordGuildId?: string }).discordGuildId ??
-            ""
+          t.guildId ?? t.discordGuildId ?? ""
         ).trim();
         if (gid) channelToGuild[chId] = gid;
         const le = t.lastSendError;
@@ -609,8 +637,50 @@ export function ServersView() {
           }
         }
         if (t.paused) paused.add(chId);
-        else if (campHasMessage) running.add(chId);
+        else if (campHasCopy) running.add(chId);
       }
+    };
+
+    for (const c of campaigns) {
+      const intervalMs =
+        c?.intervalMs != null ? Number(c.intervalMs) : Number.NaN;
+      const campIntervalSec =
+        Number.isFinite(intervalMs) && intervalMs > 0
+          ? Math.max(1, Math.round(intervalMs / 1000))
+          : null;
+      const campHasMessage = String(c.message ?? "").trim().length > 0;
+      const touchesBot = (c.targets ?? []).some(
+        (t) => discordId(t.botId) === discordId(activeBotId)
+      );
+      if (
+        touchesBot &&
+        campIntervalSec != null &&
+        (globalMinInterval == null || campIntervalSec < globalMinInterval)
+      ) {
+        globalMinInterval = campIntervalSec;
+      }
+
+      ingestTargetsForBot(c.targets ?? [], campIntervalSec, campHasMessage);
+    }
+
+    if (pool?.targets?.length) {
+      const intervalMs =
+        pool.intervalMs != null ? Number(pool.intervalMs) : Number.NaN;
+      const campIntervalSec =
+        Number.isFinite(intervalMs) && intervalMs > 0
+          ? Math.max(1, Math.round(intervalMs / 1000))
+          : null;
+      const touchesBot = pool.targets.some(
+        (t) => discordId(t.botId) === discordId(activeBotId)
+      );
+      if (
+        touchesBot &&
+        campIntervalSec != null &&
+        (globalMinInterval == null || campIntervalSec < globalMinInterval)
+      ) {
+        globalMinInterval = campIntervalSec;
+      }
+      ingestTargetsForBot(pool.targets, campIntervalSec, poolHasMessage);
     }
     const guildAdsSent: Record<string, number> = {};
     for (const chId of Object.keys(channelAdsSent)) {
