@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/admin/overview", label: "Overview" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/bots", label: "Bots" },
+  { href: "/admin/potential-clients", label: "Potential clients" },
 ] as const;
 
 export function AdminShell({ children }: { children: ReactNode }) {
