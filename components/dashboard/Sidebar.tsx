@@ -9,6 +9,7 @@ import {
   CreditCard,
   FileText,
   Home,
+  LayoutGrid,
   MessageSquare,
   Server,
 } from "lucide-react";
@@ -70,6 +71,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         >
           <Server size={18} strokeWidth={2} />
           <span>Servers</span>
+        </Link>
+
+        <Link
+          href="/promo-servers"
+          className={`${styles.navItem} ${pathname === "/promo-servers" ? styles.navItemActive : ""}`}
+          onClick={close}
+        >
+          <LayoutGrid size={18} strokeWidth={2} />
+          <span>Server discovery</span>
         </Link>
 
         <Link

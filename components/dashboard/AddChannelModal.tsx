@@ -40,6 +40,22 @@ export function channelNameMatchesAdKeywords(name: string): boolean {
   return /\bad\b/i.test(name);
 }
 
+/** Discovery list: advertising-style or selling / seller channels only (no generic “discord” keyword). */
+export function channelNameMatchesAdvertisingOrSelling(name: string): boolean {
+  return (
+    channelNameMatchesAdvertisingFocus(name) ||
+    channelNameMatchesSellingFocus(name)
+  );
+}
+
+/** Guild browse: any channel that looks like ads / promo / selling (union of heuristics above). */
+export function channelNameMatchesPromoDiscovery(name: string): boolean {
+  return (
+    channelNameMatchesAdvertisingOrSelling(name) ||
+    channelNameMatchesAdKeywords(name)
+  );
+}
+
 type AddChannelModalProps = {
   open: boolean;
   onClose: () => void;

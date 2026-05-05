@@ -16,6 +16,7 @@ const ALLOWED_WITHOUT_SUB = new Set(["/settings", "/subscriptions"]);
 function mobileHeaderTitle(pathname: string) {
   if (pathname === "/dashboard") return "Dashboard";
   if (pathname.startsWith("/servers")) return "Servers";
+  if (pathname.startsWith("/promo-servers")) return "Server discovery";
   if (pathname.startsWith("/messages")) return "Messages";
   if (pathname.startsWith("/logs")) return "Logs";
   if (pathname.startsWith("/settings")) return "Settings";
