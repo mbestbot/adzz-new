@@ -6,9 +6,7 @@ import { API_BASE } from "@/lib/api";
 import styles from "./landing.module.css";
 
 type PlatformStats = {
-  adsPostedToday: number;
   adsPostedTotal: number;
-  updatedAt: number;
 };
 
 const POLL_MS = 5000;
@@ -26,9 +24,12 @@ export function LandingLiveStatsSection() {
           cache: "no-store",
         });
         if (!res.ok) throw new Error("bad status");
-        const data = (await res.json()) as PlatformStats;
+        const data = (await res.json()) as Record<string, unknown>;
+        const total = Number(data.adsPostedTotal);
         if (!cancelled) {
-          setStats(data);
+          setStats({
+            adsPostedTotal: Number.isFinite(total) ? total : 0,
+          });
           setLoadError(false);
         }
       } catch {
@@ -44,10 +45,6 @@ export function LandingLiveStatsSection() {
     };
   }, []);
 
-  const today =
-    stats != null && Number.isFinite(stats.adsPostedToday)
-      ? stats.adsPostedToday
-      : null;
   const total =
     stats != null && Number.isFinite(stats.adsPostedTotal)
       ? stats.adsPostedTotal
@@ -67,46 +64,24 @@ export function LandingLiveStatsSection() {
             Live network
           </p>
           <h2 id="live-stats-heading" className={styles.liveStatsTitle}>
-            Ads flowing across Adzz right now
+            Total ads across Adzz
           </h2>
           <p className={styles.liveStatsLead}>
-            Platform-wide counters pulled from real delivery volume. Numbers
-            refresh every few seconds so visitors see live throughput and
-            all-time scale.
+            Platform-wide delivery total — refreshed automatically so this page
+            stays current as volume grows.
           </p>
         </div>
 
         <div className={styles.liveStatsGrid}>
-          <article className={styles.liveStatsCard}>
-            <div className={styles.liveStatsCardTop}>
-              <span className={styles.liveStatsLabel}>Sending today (UTC)</span>
-              <span className={styles.liveStatsBadge}>
-                <span className={styles.liveStatsPulse} aria-hidden />
-                Live
-              </span>
-            </div>
-            <p
-              className={styles.liveStatsFigure}
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {today != null
-                ? today.toLocaleString()
-                : loadError
-                  ? "—"
-                  : "…"}
-            </p>
-            <p className={styles.liveStatsHint}>
-              Successful posts counted for the current UTC calendar day.
-            </p>
-          </article>
-
           <article
             className={`${styles.liveStatsCard} ${styles.liveStatsCardTotal}`}
           >
             <div className={styles.liveStatsCardTop}>
               <span className={styles.liveStatsLabel}>Total ads posted</span>
-              <span className={styles.liveStatsBadgeMuted}>All time</span>
+              <span className={styles.liveStatsBadge}>
+                <span className={styles.liveStatsPulse} aria-hidden />
+                Live
+              </span>
             </div>
             <p
               className={styles.liveStatsFigure}
@@ -120,7 +95,8 @@ export function LandingLiveStatsSection() {
                   : "…"}
             </p>
             <p className={styles.liveStatsHint}>
-              Cumulative sends recorded across every connected workspace.
+              Cumulative successful sends recorded across every connected
+              workspace.
             </p>
           </article>
         </div>

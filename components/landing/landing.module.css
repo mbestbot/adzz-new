@@ -1335,7 +1335,10 @@
 
 .liveStatsGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  max-width: min(720px, 100%);
+  margin-left: auto;
+  margin-right: auto;
   gap: clamp(1rem, 3vw, 1.75rem);
   align-items: stretch;
 }
@@ -1396,18 +1399,6 @@
   border: 1px solid rgba(74, 222, 128, 0.35);
 }
 
-.liveStatsBadgeMuted {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--dash-muted-2);
-  padding: 0.28rem 0.65rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
 .liveStatsPulse {
   width: 7px;
   height: 7px;
@@ -1424,7 +1415,7 @@
 
 .liveStatsFigure {
   margin: 0;
-  font-size: clamp(2.75rem, 10vw, 4.5rem);
+  font-size: clamp(3rem, 12vw, 5rem);
   font-weight: 800;
   letter-spacing: -0.045em;
   line-height: 1;
@@ -1467,10 +1458,6 @@
 }
 
 @media (max-width: 720px) {
-  .liveStatsGrid {
-    grid-template-columns: 1fr;
-  }
-
   .liveStatsSection {
     padding-left: 0;
     padding-right: 0;
