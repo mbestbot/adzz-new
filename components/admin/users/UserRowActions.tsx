@@ -11,12 +11,19 @@ type DialogState =
   | null
   | { kind: "plan"; tier: "pro" | "business" }
   | { kind: "extend" }
-  | { kind: "password" };
+  | { kind: "password" }
+  | { kind: "otp" };
 
 function parseDaysInput(raw: string) {
   const n = Number(String(raw).trim());
   if (!Number.isFinite(n) || n <= 0) return 30;
   return Math.min(3650, Math.floor(n));
+}
+
+function parseOtpHours(raw: string) {
+  const n = Number(String(raw).trim());
+  if (!Number.isFinite(n) || n <= 0) return 24;
+  return Math.min(168, Math.floor(n));
 }
 
 function formatDateTime(ms: number | null) {
@@ -48,6 +55,9 @@ export function UserRowActions({
   const [daysInput, setDaysInput] = useState("30");
   const [passwordInput, setPasswordInput] = useState("");
   const [confirmPasswordInput, setConfirmPasswordInput] = useState("");
+  const [otpPasswordInput, setOtpPasswordInput] = useState("");
+  const [otpConfirmInput, setOtpConfirmInput] = useState("");
+  const [otpHoursInput, setOtpHoursInput] = useState("24");
 
   useEffect(() => {
     if (!manageOpen && !dialog) return;
@@ -56,6 +66,11 @@ export function UserRowActions({
       if (dialog?.kind === "password") {
         setPasswordInput("");
         setConfirmPasswordInput("");
+      }
+      if (dialog?.kind === "otp") {
+        setOtpPasswordInput("");
+        setOtpConfirmInput("");
+        setOtpHoursInput("24");
       }
       if (dialog) setDialog(null);
       else if (manageOpen) setManageOpen(false);
@@ -118,6 +133,30 @@ export function UserRowActions({
     );
     setPasswordInput("");
     setConfirmPasswordInput("");
+    setDialog(null);
+  };
+
+  const applyOtp = () => {
+    if (!dialog || dialog.kind !== "otp") return;
+    const p = otpPasswordInput;
+    if (p.length < 6) {
+      onError("One-time password must be at least 6 characters");
+      return;
+    }
+    if (p !== otpConfirmInput) {
+      onError("Passwords do not match");
+      return;
+    }
+    const validHours = parseOtpHours(otpHoursInput);
+    void run(() =>
+      adminPostJson<UsersListResponse>(`${base}/one-time-password`, {
+        password: p,
+        validHours,
+      })
+    );
+    setOtpPasswordInput("");
+    setOtpConfirmInput("");
+    setOtpHoursInput("24");
     setDialog(null);
   };
 
@@ -202,9 +241,8 @@ export function UserRowActions({
                 Set login password
               </h2>
               <p className={styles.modalHint}>
-                Lets them sign in with this account&apos;s email and password (e.g.
-                after Discord-only signup). Share the password securely; it is not
-                shown again.
+                Replaces their saved login password (works for email/password accounts
+                too, e.g. forgotten password). Share securely; it is not shown again.
               </p>
               <label className={styles.modalLabel} htmlFor={`admin-pw-${user.id}`}>
                 New password
@@ -249,6 +287,100 @@ export function UserRowActions({
                   onClick={applyPassword}
                 >
                   Save password
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )
+      : null;
+
+  const otpModal =
+    dialog?.kind === "otp" && typeof document !== "undefined"
+      ? createPortal(
+          <div
+            className={styles.overlayDays}
+            role="presentation"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setOtpPasswordInput("");
+                setOtpConfirmInput("");
+                setOtpHoursInput("24");
+                setDialog(null);
+              }
+            }}
+          >
+            <div
+              className={styles.modal}
+              role="dialog"
+              aria-modal
+              aria-labelledby="admin-otp-title"
+            >
+              <h2 id="admin-otp-title" className={styles.modalTitle}>
+                One-time password
+              </h2>
+              <p className={styles.modalHint}>
+                Extra login password only you assign: sign in with their email and this
+                password. Their normal password is unchanged. After the next{" "}
+                <strong>successful</strong> login using this password, it is removed
+                automatically (one use). Expires after the hours below if unused.
+              </p>
+              <label className={styles.modalLabel} htmlFor={`admin-otp-h-${user.id}`}>
+                Valid for (hours, max 168)
+              </label>
+              <input
+                id={`admin-otp-h-${user.id}`}
+                className={styles.modalInput}
+                type="number"
+                min={1}
+                max={168}
+                value={otpHoursInput}
+                onChange={(e) => setOtpHoursInput(e.target.value)}
+              />
+              <label className={styles.modalLabel} htmlFor={`admin-otp-p-${user.id}`}>
+                One-time password
+              </label>
+              <input
+                id={`admin-otp-p-${user.id}`}
+                className={styles.modalInput}
+                type="password"
+                autoComplete="new-password"
+                value={otpPasswordInput}
+                onChange={(e) => setOtpPasswordInput(e.target.value)}
+              />
+              <label
+                className={styles.modalLabel}
+                htmlFor={`admin-otp-p2-${user.id}`}
+              >
+                Confirm
+              </label>
+              <input
+                id={`admin-otp-p2-${user.id}`}
+                className={styles.modalInput}
+                type="password"
+                autoComplete="new-password"
+                value={otpConfirmInput}
+                onChange={(e) => setOtpConfirmInput(e.target.value)}
+              />
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.modalBtn}
+                  onClick={() => {
+                    setOtpPasswordInput("");
+                    setOtpConfirmInput("");
+                    setOtpHoursInput("24");
+                    setDialog(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.modalBtn} ${styles.modalBtnPrimary}`}
+                  onClick={applyOtp}
+                >
+                  Save one-time password
                 </button>
               </div>
             </div>
@@ -449,9 +581,11 @@ export function UserRowActions({
                 <div className={styles.actionBlock}>
                   <h3 className={styles.actionHeading}>Account</h3>
                   <p className={styles.actionHint}>
-                    Passwords are hashed and cannot be displayed. Use{" "}
-                    <strong>Set login password</strong> to set a known password for
-                    support login (share it securely).
+                    Passwords are hashed and cannot be displayed.{" "}
+                    <strong>Set login password</strong> replaces their main password
+                    (forgotten password, Discord-only, etc.).{" "}
+                    <strong>One-time password</strong> adds a single-use extra login;
+                    their normal password stays the same.
                   </p>
                   <div className={styles.btnRow}>
                     <button
@@ -465,6 +599,39 @@ export function UserRowActions({
                       }}
                     >
                       Set login password
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btn}
+                      disabled={busy}
+                      onClick={() => {
+                        setOtpPasswordInput("");
+                        setOtpConfirmInput("");
+                        setOtpHoursInput("24");
+                        setDialog({ kind: "otp" });
+                      }}
+                    >
+                      One-time password
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btn}
+                      disabled={busy}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            "Remove any pending one-time password for this user?"
+                          )
+                        )
+                          return;
+                        void run(() =>
+                          adminDeleteJson<UsersListResponse>(
+                            `${base}/one-time-password`
+                          )
+                        );
+                      }}
+                    >
+                      Revoke one-time password
                     </button>
                     <button
                       type="button"
@@ -496,6 +663,7 @@ export function UserRowActions({
     <td className={styles.actionsCell}>
       {daysModal}
       {passwordModal}
+      {otpModal}
       {managePanel}
       <button
         type="button"
