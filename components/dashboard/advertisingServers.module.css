@@ -134,38 +134,11 @@
 }
 
 .meta {
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.45rem;
   font-size: 0.68rem;
   font-weight: 600;
   color: var(--dash-muted);
-}
-
-.botLine {
-  margin: 0 0 0.35rem;
-  font-size: 0.6rem;
-  font-weight: 600;
-  line-height: 1.35;
-  color: var(--dash-text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 100%;
-  padding: 0 0.15rem;
-}
-
-.channelsPreview {
-  margin: 0 0 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 500;
-  line-height: 1.35;
-  color: var(--dash-text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  max-width: 100%;
-  padding: 0 0.15rem;
+  flex: 1;
 }
 
 .openLink {

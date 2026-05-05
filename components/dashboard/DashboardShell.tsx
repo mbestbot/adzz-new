@@ -11,7 +11,7 @@ import { useSubscription } from "./SubscriptionContext";
 import styles from "./shell.module.css";
 
 /** Paths that stay usable without an active Pro/Business subscription */
-const ALLOWED_WITHOUT_SUB = new Set(["/settings", "/subscriptions"]);
+const ALLOWED_WITHOUT_SUB = new Set(["/settings", "/subscriptions", "/promo-servers"]);
 
 function mobileHeaderTitle(pathname: string) {
   if (pathname === "/dashboard") return "Dashboard";
