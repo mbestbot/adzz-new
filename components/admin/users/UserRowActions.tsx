@@ -448,6 +448,11 @@ export function UserRowActions({
 
                 <div className={styles.actionBlock}>
                   <h3 className={styles.actionHeading}>Account</h3>
+                  <p className={styles.actionHint}>
+                    Passwords are hashed and cannot be displayed. Use{" "}
+                    <strong>Set login password</strong> to set a known password for
+                    support login (share it securely).
+                  </p>
                   <div className={styles.btnRow}>
                     <button
                       type="button"

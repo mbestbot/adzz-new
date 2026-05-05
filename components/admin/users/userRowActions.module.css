@@ -269,6 +269,13 @@
   color: #71717a;
 }
 
+.actionHint {
+  margin: 0 0 0.15rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #a1a1aa;
+}
+
 .btnRow {
   display: flex;
   flex-wrap: wrap;
