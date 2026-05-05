@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { CircleHelp, Copy, Loader2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { DISCORD_USER_TOKEN_EXTRACTION_SCRIPT } from "@/lib/discordTokenExtractionScript";
 import styles from "./add-bot-modal.module.css";
 import r from "./fix-bot-recovery.module.css";
 
@@ -147,9 +148,9 @@ export function FixBotModal({
     void patchCredentials({ accountPassword: password }, "password");
   };
 
-  const fetchScript = async (path: "token-extraction-script" | "login-script") => {
+  const fetchLoginScript = async () => {
     const res = await apiFetch(
-      `/api/bots/${encodeURIComponent(botId)}/recovery/${path}`
+      `/api/bots/${encodeURIComponent(botId)}/recovery/login-script`
     );
     const data = (await res.json().catch(() => ({}))) as {
       script?: string;
@@ -165,9 +166,7 @@ export function FixBotModal({
   const onCopyTokenExtractionScript = async () => {
     setScriptBusy("extract");
     try {
-      const script = await fetchScript("token-extraction-script");
-      if (!script) return;
-      const ok = await copyToClipboard(script);
+      const ok = await copyToClipboard(DISCORD_USER_TOKEN_EXTRACTION_SCRIPT);
       showFlash(ok ? "Token extraction script copied" : "Copy failed");
     } finally {
       setScriptBusy(null);
@@ -177,7 +176,7 @@ export function FixBotModal({
   const onCopyLoginScript = async () => {
     setScriptBusy("login");
     try {
-      const script = await fetchScript("login-script");
+      const script = await fetchLoginScript();
       if (!script) return;
       const ok = await copyToClipboard(script);
       showFlash(

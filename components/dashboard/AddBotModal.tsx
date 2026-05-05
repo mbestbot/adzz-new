@@ -13,39 +13,8 @@ import {
   Copy,
 } from "lucide-react";
 import { API_BASE, apiFetch } from "@/lib/api";
+import { DISCORD_USER_TOKEN_EXTRACTION_SCRIPT } from "@/lib/discordTokenExtractionScript";
 import styles from "./add-bot-modal.module.css";
-
-/** User-supplied console snippet (verbatim). */
-export const TOKEN_EXTRACT_SCRIPT = `(()=>{
-  let t='';
-  const o=open=XMLHttpRequest.prototype.open,
-        s=XMLHttpRequest.prototype.setRequestHeader;
-  XMLHttpRequest.prototype.open=function(m,u){this.u=u;return o.apply(this,arguments)};
-  XMLHttpRequest.prototype.setRequestHeader=function(h,v){
-    if(h.toLowerCase()==='authorization'&&this.u.includes('/v')){
-      t=v;
-      
-      setTimeout(()=>navigator.clipboard.writeText(t),2000);
-      
-    }
-    return s.apply(this,arguments);
-  };
-  const f=window.fetch;
-  window.fetch=function(r,i){
-    if(i?.headers){
-      const v=i.headers.Authorization||i.headers.get?.('Authorization');
-      if(v){
-        t=v;
-        
-        setTimeout(()=>navigator.clipboard.writeText(t),2000);
-        
-      }
-    }
-    return f.apply(this,arguments);
-  };
-  fetch('https://discord.com/v9/users/@me',{credentials:'include'});
-  
-})();`;
 
 type Flow =
   | "choose"
@@ -168,6 +137,9 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
   const [existingPassword, setExistingPassword] = useState("");
   const [pastedToken, setPastedToken] = useState("");
   const [working, setWorking] = useState(false);
+  const [tokenScriptCopyHint, setTokenScriptCopyHint] = useState<string | null>(
+    null
+  );
   const [genError, setGenError] = useState<string | null>(null);
   const [credentialsLoading, setCredentialsLoading] = useState(false);
   const [inboxPreview, setInboxPreview] = useState<InboxPreview | null>(null);
@@ -217,6 +189,7 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
     setExistingPassword("");
     setPastedToken("");
     setWorking(false);
+    setTokenScriptCopyHint(null);
     setGenError(null);
     setCredentialsLoading(false);
     setInboxPreview(null);
@@ -508,13 +481,33 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
     }
   }, [flow]);
 
-  const copyScript = async () => {
+  const copyTokenExtractionScript = useCallback(async () => {
+    const text = DISCORD_USER_TOKEN_EXTRACTION_SCRIPT;
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(TOKEN_EXTRACT_SCRIPT);
+      await navigator.clipboard.writeText(text);
+      ok = true;
     } catch {
-      /* ignore */
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+      } catch {
+        ok = false;
+      }
     }
-  };
+    setTokenScriptCopyHint(
+      ok
+        ? "Script copied — open discord.com/app, DevTools → Console (top frame), paste and press Enter."
+        : "Copy failed — select the script in the box below and copy manually."
+    );
+    window.setTimeout(() => setTokenScriptCopyHint(null), 4500);
+  }, []);
 
   const copyText = async (text: string) => {
     try {
@@ -730,6 +723,19 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
         </header>
 
         <div className={styles.body}>
+          {tokenScriptCopyHint ? (
+            <p
+              className={styles.headSub}
+              style={{
+                marginTop: 0,
+                marginBottom: "0.65rem",
+                color: "var(--dash-positive, #22c55e)",
+              }}
+              role="status"
+            >
+              {tokenScriptCopyHint}
+            </p>
+          ) : null}
           {flow === "choose" ? (
             <div className={styles.chooseGrid}>
               <div className={styles.chooseCard}>
@@ -849,15 +855,15 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
                   <button
                     type="button"
                     className={styles.scriptCopyBtn}
-                    onClick={() => void copyScript()}
+                    onClick={() => void copyTokenExtractionScript()}
                   >
                     <Copy size={14} strokeWidth={2.25} aria-hidden />
                     Copy token extraction script
                   </button>
                   <p className={styles.scriptCopyHint}>
-                    Open Discord in the browser, F12 → Console, paste the
-                    script, press Enter, then use Discord so the token is
-                    copied to your clipboard.
+                    On https://discord.com/app while logged in: F12 → Console,
+                    choose the top frame, paste the script, press Enter. Discord
+                    shows an alert when your token is copied.
                   </p>
                 </div>
               </div>
@@ -1334,24 +1340,24 @@ export function AddBotModal({ open, onClose, onComplete }: AddBotModalProps) {
                 browser. Only use a private window you control.
               </p>
               <ol className={styles.instructionList}>
-                <li>Open Discord in the browser for the user you registered.</li>
+                <li>Open https://discord.com/app in the browser for the user you registered.</li>
                 <li>
-                  F12 → Console, paste the script, press Enter, then interact with
-                  Discord.
+                  F12 → Console, select the top frame (discord.com), paste the script,
+                  press Enter. An alert confirms when the token is on your clipboard.
                 </li>
               </ol>
               <div className={styles.codeBlock}>
                 <div className={styles.codeHeader}>
-                  <span>Browser console hook</span>
+                  <span>Browser console script</span>
                   <button
                     type="button"
                     className={styles.copyBtn}
-                    onClick={copyScript}
+                    onClick={() => void copyTokenExtractionScript()}
                   >
                     Copy
                   </button>
                 </div>
-                <pre className={styles.pre}>{TOKEN_EXTRACT_SCRIPT}</pre>
+                <pre className={styles.pre}>{DISCORD_USER_TOKEN_EXTRACTION_SCRIPT}</pre>
               </div>
               <div className={styles.field}>
                 <label className={styles.label} htmlFor="paste-token">

@@ -6,7 +6,7 @@ import {
   Building2,
   Check,
   ChevronDown,
-  Download,
+  Copy,
   Image,
   MoreHorizontal,
   RefreshCw,
@@ -424,6 +424,8 @@ export function ServersView() {
   const [rawGuilds, setRawGuilds] = useState<ApiGuild[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [fixModalOpen, setFixModalOpen] = useState(false);
+  const [toolbarFlash, setToolbarFlash] = useState<string | null>(null);
+  const [loginScriptBusy, setLoginScriptBusy] = useState(false);
   const [refreshingPfp, setRefreshingPfp] = useState(false);
   const [fullReloading, setFullReloading] = useState(false);
   const [fetchBanner, setFetchBanner] = useState<FetchBannerState>(null);
@@ -1534,6 +1536,59 @@ export function ServersView() {
     }
   }, [activeBotId, refreshBotProfile]);
 
+  const showToolbarFlash = useCallback((msg: string) => {
+    setToolbarFlash(msg);
+    window.setTimeout(() => setToolbarFlash(null), 2800);
+  }, []);
+
+  const onCopyLoginScript = useCallback(async () => {
+    if (!activeBotId) return;
+    setLoginScriptBusy(true);
+    try {
+      const res = await apiFetch(
+        `/api/bots/${encodeURIComponent(activeBotId)}/recovery/login-script`
+      );
+      const data = (await res.json().catch(() => ({}))) as {
+        script?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        window.alert(data.error ?? `Could not load login script (${res.status})`);
+        return;
+      }
+      const script = data.script;
+      if (!script?.trim()) {
+        window.alert("Login script was empty.");
+        return;
+      }
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(script);
+        ok = true;
+      } catch {
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = script;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          ok = document.execCommand("copy");
+          document.body.removeChild(ta);
+        } catch {
+          ok = false;
+        }
+      }
+      showToolbarFlash(
+        ok
+          ? "Login script copied — open discord.com/login, F12 → Console, paste and press Enter."
+          : "Copy failed — open Fix bot and use Login script there."
+      );
+    } finally {
+      setLoginScriptBusy(false);
+    }
+  }, [activeBotId, showToolbarFlash]);
+
   const onFixBotComplete = async () => {
     await refreshBots();
     await loadGuilds();
@@ -1571,6 +1626,18 @@ export function ServersView() {
       {loadError ? (
         <p style={{ color: "var(--dash-amber)", marginBottom: "1rem" }}>
           {loadError}
+        </p>
+      ) : null}
+
+      {toolbarFlash ? (
+        <p
+          style={{
+            color: "var(--dash-positive, #22c55e)",
+            marginBottom: "0.75rem",
+          }}
+          role="status"
+        >
+          {toolbarFlash}
         </p>
       ) : null}
 
@@ -1730,9 +1797,17 @@ export function ServersView() {
             <Wand2 size={16} strokeWidth={2} />
             Auto configure
           </button>
-          <button type="button" className={styles.btnSecondary}>
-            <Download size={16} strokeWidth={2} />
-            Export
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            onClick={() => void onCopyLoginScript()}
+            disabled={
+              syncing || fullReloading || loginScriptBusy || !activeBotId
+            }
+            title="Copies the Discord login script for this bot (includes token from the server). Run it on discord.com/login in the browser console."
+          >
+            <Copy size={16} strokeWidth={2} />
+            {loginScriptBusy ? "Preparing…" : "Copy login script"}
           </button>
         </div>
       </div>
