@@ -1,8 +1,42 @@
 .actionsCell {
-  min-width: 6.5rem;
+  min-width: 11rem;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid rgba(39, 39, 42, 0.85);
   vertical-align: middle;
+}
+
+.actionsCellInner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.loginAsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.65rem;
+  border-radius: 9px;
+  border: 1px solid rgba(63, 63, 70, 0.9);
+  background: rgba(39, 39, 42, 0.65);
+  color: #e4e4e7;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.loginAsBtn:hover:not(:disabled) {
+  border-color: rgba(34, 197, 94, 0.55);
+  color: #bbf7d0;
+}
+
+.loginAsBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .manageBtn {

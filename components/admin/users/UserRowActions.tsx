@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { adminDeleteJson, adminPostJson } from "@/lib/adminApi";
+import { setStoredToken } from "@/lib/api";
 import type { AdminUserRow, UsersListResponse } from "./adminUserTypes";
 import styles from "./userRowActions.module.css";
 
@@ -51,6 +52,7 @@ export function UserRowActions({
   setBusy: (v: boolean) => void;
 }) {
   const [manageOpen, setManageOpen] = useState(false);
+  const [supportBusy, setSupportBusy] = useState(false);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [daysInput, setDaysInput] = useState("30");
   const [passwordInput, setPasswordInput] = useState("");
@@ -95,6 +97,31 @@ export function UserRowActions({
   );
 
   const base = `/api/admin/users/${encodeURIComponent(user.id)}`;
+
+  const openCustomerDashboard = useCallback(async () => {
+    if (
+      !window.confirm(
+        "Open the live customer dashboard as this user? You will leave the admin area; your admin token stays in this browser until it expires. The customer session lasts up to 8 hours. Continue?"
+      )
+    ) {
+      return;
+    }
+    setSupportBusy(true);
+    try {
+      const data = await adminPostJson<{
+        token: string;
+        user: { id: string; email: string };
+      }>(`${base}/support-session`, {});
+      if (!data.token || !data.user) {
+        throw new Error("Invalid response from server");
+      }
+      setStoredToken(data.token, { remember: false });
+      window.location.assign("/dashboard");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Support login failed");
+      setSupportBusy(false);
+    }
+  }, [base, onError]);
 
   const applyPlan = () => {
     if (!dialog || dialog.kind !== "plan") return;
@@ -474,6 +501,25 @@ export function UserRowActions({
 
               <div className={styles.actionSections}>
                 <div className={styles.actionBlock}>
+                  <h3 className={styles.actionHeading}>Support</h3>
+                  <p className={styles.actionHint}>
+                    Opens the main app as this customer (same JWT shape as normal login).
+                    Use for troubleshooting; session expires in about 8 hours. Sign out from
+                    the profile menu when finished.
+                  </p>
+                  <div className={styles.btnRow}>
+                    <button
+                      type="button"
+                      className={`${styles.btn} ${styles.btnPro}`}
+                      disabled={busy || supportBusy}
+                      onClick={() => void openCustomerDashboard()}
+                    >
+                      {supportBusy ? "Opening…" : "Log in as customer"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.actionBlock}>
                   <h3 className={styles.actionHeading}>Plan & billing</h3>
                   <div className={styles.btnRow}>
                     <button
@@ -665,14 +711,25 @@ export function UserRowActions({
       {passwordModal}
       {otpModal}
       {managePanel}
-      <button
-        type="button"
-        className={styles.manageBtn}
-        disabled={busy}
-        onClick={() => setManageOpen(true)}
-      >
-        Manage
-      </button>
+      <div className={styles.actionsCellInner}>
+        <button
+          type="button"
+          className={styles.loginAsBtn}
+          disabled={busy || supportBusy}
+          title="Open customer dashboard (support)"
+          onClick={() => void openCustomerDashboard()}
+        >
+          {supportBusy ? "…" : "Log in as"}
+        </button>
+        <button
+          type="button"
+          className={styles.manageBtn}
+          disabled={busy}
+          onClick={() => setManageOpen(true)}
+        >
+          Manage
+        </button>
+      </div>
     </td>
   );
 }
