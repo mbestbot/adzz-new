@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 import styles from "./landing.module.css";
 
@@ -9,7 +8,8 @@ type PlatformStats = {
   adsPostedTotal: number;
 };
 
-const POLL_MS = 5000;
+/** Fast polling so the total feels live; pauses when the tab is hidden. */
+const POLL_MS = 2000;
 
 export function LandingLiveStatsSection() {
   const [stats, setStats] = useState<PlatformStats | null>(null);
@@ -17,6 +17,7 @@ export function LandingLiveStatsSection() {
 
   useEffect(() => {
     let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     async function pull() {
       try {
@@ -37,11 +38,36 @@ export function LandingLiveStatsSection() {
       }
     }
 
-    void pull();
-    const id = window.setInterval(pull, POLL_MS);
+    function stopPolling() {
+      if (intervalId != null) {
+        clearInterval(intervalId);
+        intervalId = undefined;
+      }
+    }
+
+    function startPolling() {
+      stopPolling();
+      intervalId = setInterval(() => {
+        void pull();
+      }, POLL_MS);
+    }
+
+    function syncPolling() {
+      if (typeof document !== "undefined" && document.hidden) {
+        stopPolling();
+        return;
+      }
+      void pull();
+      startPolling();
+    }
+
+    syncPolling();
+    document.addEventListener("visibilitychange", syncPolling);
+
     return () => {
       cancelled = true;
-      window.clearInterval(id);
+      stopPolling();
+      document.removeEventListener("visibilitychange", syncPolling);
     };
   }, []);
 
@@ -54,57 +80,35 @@ export function LandingLiveStatsSection() {
     <section
       id="live-network-stats"
       className={styles.liveStatsSection}
-      aria-labelledby="live-stats-heading"
+      aria-labelledby="live-stats-label"
     >
-      <div className={styles.liveStatsGlow} aria-hidden />
       <div className={styles.liveStatsInner}>
-        <div className={styles.liveStatsIntro}>
-          <p className={styles.liveStatsEyebrow}>
-            <Activity size={14} strokeWidth={2.25} aria-hidden />
-            Live network
-          </p>
-          <h2 id="live-stats-heading" className={styles.liveStatsTitle}>
-            Total ads across Adzz
-          </h2>
-          <p className={styles.liveStatsLead}>
-            Platform-wide delivery total — refreshed automatically so this page
-            stays current as volume grows.
-          </p>
+        <div className={styles.liveStatsMeta}>
+          <span id="live-stats-label" className={styles.liveStatsLabelPlain}>
+            Total ads posted
+          </span>
+          <span className={styles.liveStatsBadge}>
+            <span className={styles.liveStatsPulse} aria-hidden />
+            Live
+          </span>
         </div>
 
-        <div className={styles.liveStatsGrid}>
-          <article
-            className={`${styles.liveStatsCard} ${styles.liveStatsCardTotal}`}
-          >
-            <div className={styles.liveStatsCardTop}>
-              <span className={styles.liveStatsLabel}>Total ads posted</span>
-              <span className={styles.liveStatsBadge}>
-                <span className={styles.liveStatsPulse} aria-hidden />
-                Live
-              </span>
-            </div>
-            <p
-              className={styles.liveStatsFigure}
-              aria-live="polite"
-              aria-atomic="true"
-            >
-              {total != null
-                ? total.toLocaleString()
-                : loadError
-                  ? "—"
-                  : "…"}
-            </p>
-            <p className={styles.liveStatsHint}>
-              Cumulative successful sends recorded across every connected
-              workspace.
-            </p>
-          </article>
-        </div>
+        <p
+          className={styles.liveStatsMega}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {total != null
+            ? total.toLocaleString()
+            : loadError
+              ? "—"
+              : "…"}
+        </p>
 
         <p className={styles.liveStatsFoot}>
           {loadError && stats == null
             ? "Could not load live stats — check that the API is reachable."
-            : `Updates every ${POLL_MS / 1000}s · Same totals power your dashboard analytics.`}
+            : `Updating live every ${POLL_MS / 1000}s`}
         </p>
       </div>
     </section>

@@ -1243,7 +1243,7 @@
   }
 }
 
-/* --- Live platform stats (landing) --- */
+/* --- Live platform stats (landing): text-only, huge total --- */
 
 @keyframes liveDotPulse {
   0%,
@@ -1258,128 +1258,30 @@
 }
 
 .liveStatsSection {
-  position: relative;
   margin: 0;
-  padding: clamp(2.5rem, 6vw, 4rem) 0 clamp(2.75rem, 7vw, 4.5rem);
-  overflow: hidden;
-}
-
-.liveStatsGlow {
-  position: absolute;
-  inset: -20% -10% auto;
-  height: min(480px, 70vw);
-  pointer-events: none;
-  background:
-    radial-gradient(
-      ellipse 70% 55% at 50% 0%,
-      rgba(124, 58, 237, 0.22),
-      transparent 62%
-    ),
-    radial-gradient(
-      ellipse 45% 40% at 15% 40%,
-      rgba(232, 121, 249, 0.12),
-      transparent 58%
-    ),
-    radial-gradient(
-      ellipse 40% 38% at 85% 35%,
-      rgba(74, 222, 128, 0.08),
-      transparent 55%
-    );
-  z-index: 0;
+  padding: clamp(2rem, 5vw, 3.5rem) 0 clamp(2.5rem, 6vw, 4rem);
+  text-align: center;
+  overflow-x: clip;
 }
 
 .liveStatsInner {
-  position: relative;
-  z-index: 1;
-  max-width: min(1120px, 100%);
+  max-width: min(100%, 1200px);
   margin: 0 auto;
 }
 
-.liveStatsIntro {
-  text-align: center;
-  max-width: 42rem;
-  margin: 0 auto clamp(2rem, 5vw, 3rem);
-}
-
-.liveStatsEyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 1rem;
-  padding: 0.35rem 0.85rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--dash-accent-mid);
-  background: rgba(124, 58, 237, 0.14);
-  border: 1px solid rgba(192, 132, 252, 0.28);
-}
-
-.liveStatsTitle {
-  margin: 0 0 0.85rem;
-  font-size: clamp(1.65rem, 4vw, 2.35rem);
-  font-weight: 800;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
-  color: var(--dash-text);
-}
-
-.liveStatsLead {
-  margin: 0;
-  font-size: clamp(0.95rem, 2vw, 1.05rem);
-  line-height: 1.55;
-  color: var(--dash-muted);
-}
-
-.liveStatsGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  max-width: min(720px, 100%);
-  margin-left: auto;
-  margin-right: auto;
-  gap: clamp(1rem, 3vw, 1.75rem);
-  align-items: stretch;
-}
-
-.liveStatsCard {
-  position: relative;
-  padding: clamp(1.5rem, 4vw, 2.25rem) clamp(1.35rem, 3.5vw, 2rem);
-  border-radius: 20px;
-  background: linear-gradient(
-    165deg,
-    rgba(24, 14, 36, 0.92) 0%,
-    rgba(10, 8, 18, 0.88) 100%
-  );
-  border: 1px solid rgba(167, 139, 250, 0.22);
-  box-shadow:
-    0 24px 56px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-.liveStatsCardTotal {
-  border-color: rgba(124, 58, 237, 0.35);
-  background: linear-gradient(
-    165deg,
-    rgba(30, 18, 48, 0.95) 0%,
-    rgba(12, 10, 22, 0.92) 100%
-  );
-}
-
-.liveStatsCardTop {
+.liveStatsMeta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+  justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 0.65rem;
+  gap: 0.65rem 1rem;
+  margin-bottom: clamp(0.75rem, 2vw, 1.25rem);
 }
 
-.liveStatsLabel {
-  font-size: 0.8125rem;
+.liveStatsLabelPlain {
+  font-size: clamp(0.8125rem, 2vw, 0.9375rem);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--dash-muted);
 }
@@ -1413,46 +1315,29 @@
   }
 }
 
-.liveStatsFigure {
+.liveStatsMega {
   margin: 0;
-  font-size: clamp(3rem, 12vw, 5rem);
+  padding: 0 0.25rem;
+  font-size: clamp(4.25rem, 26vmin, 14rem);
   font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1;
+  letter-spacing: -0.055em;
+  line-height: 0.95;
   font-variant-numeric: tabular-nums;
   background: linear-gradient(
     180deg,
-    #faf5ff 0%,
-    #e9d5ff 38%,
-    #c084fc 100%
+    #fdf4ff 0%,
+    #e9d5ff 35%,
+    #c084fc 72%,
+    #a855f7 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 2px 24px rgba(124, 58, 237, 0.35));
-}
-
-.liveStatsCardTotal .liveStatsFigure {
-  background: linear-gradient(
-    180deg,
-    #f5f3ff 0%,
-    #ddd6fe 42%,
-    #a78bfa 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-.liveStatsHint {
-  margin: 1rem 0 0;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: var(--dash-muted);
+  filter: drop-shadow(0 4px 40px rgba(124, 58, 237, 0.42));
 }
 
 .liveStatsFoot {
-  margin: clamp(1.75rem, 4vw, 2.25rem) 0 0;
-  text-align: center;
+  margin: clamp(1rem, 3vw, 1.75rem) 0 0;
   font-size: 0.8125rem;
   color: var(--dash-muted-2);
 }
