@@ -22,6 +22,7 @@ import {
 import styles from "./landing.module.css";
 import { TrialDiscordTicketLine } from "@/components/TrialDiscordTicketLine";
 import { LandingNav } from "./LandingNav";
+import { LandingLiveStatsSection } from "./LandingLiveStatsSection";
 
 const FEATURES = [
   {
@@ -203,6 +204,8 @@ export function LandingPage() {
             </div>
           </div>
         </section>
+
+        <LandingLiveStatsSection />
 
         <section
           id="features"

@@ -101,12 +101,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         </Link>
       </nav>
 
-      <div className={styles.tools}>
-        <Link href="/generate-email" className={styles.toolsLink} onClick={close}>
-          Generate test email
-        </Link>
-      </div>
-
       <div className={styles.footer}>
         <div
           className={`${styles.subCardPack} ${pack.kpiCardPack} ${pack.kpiCardPackNeutral}`}

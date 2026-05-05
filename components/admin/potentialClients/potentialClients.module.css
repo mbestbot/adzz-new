@@ -1,3 +1,63 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.searchWrap {
+  flex: 1;
+  min-width: 200px;
+  max-width: 24rem;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-surface-2);
+}
+
+.searchWrap svg {
+  flex-shrink: 0;
+  color: var(--dash-muted);
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--dash-text);
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--dash-border-strong);
+  background: var(--dash-surface-3);
+  color: var(--dash-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.refreshBtn:hover:not(:disabled) {
+  border-color: rgba(167, 139, 250, 0.45);
+  color: var(--dash-text);
+}
+
+.refreshBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10.25rem, 1fr));
