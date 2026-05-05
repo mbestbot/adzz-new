@@ -14,6 +14,12 @@ type DiscoveryServer = {
   openInDiscordUrl: string;
 };
 
+type DiscoveryResponse = {
+  servers?: DiscoveryServer[];
+  generatedAt?: number | null;
+  error?: string;
+};
+
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
   const ext = icon.startsWith("a_") ? "gif" : "png";
@@ -38,33 +44,41 @@ const POLL_MS = 60_000;
 
 export function PromoServersView() {
   const [servers, setServers] = useState<DiscoveryServer[] | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
 
-  const load = useCallback(async () => {
-    setLoadErr(null);
-    setLoading(true);
+  const load = useCallback(async (mode: "full" | "quiet" = "full") => {
+    const noisy = mode === "full";
+    if (noisy) {
+      setLoadErr(null);
+      setLoading(true);
+    }
     try {
       const res = await apiFetch("/api/discovery/posting-servers");
-      const data = (await res.json().catch(() => ({}))) as {
-        servers?: DiscoveryServer[];
-        error?: string;
-      };
+      const data = (await res.json().catch(() => ({}))) as DiscoveryResponse;
       if (!res.ok) {
         throw new Error(data.error ?? `Load failed (${res.status})`);
       }
       setServers(data.servers ?? []);
+      setGeneratedAt(
+        data.generatedAt != null && Number.isFinite(data.generatedAt)
+          ? data.generatedAt
+          : null
+      );
+      setLoadErr(null);
     } catch (e) {
-      setLoadErr(e instanceof Error ? e.message : "Could not load servers");
-      setServers(null);
+      const msg = e instanceof Error ? e.message : "Could not load servers";
+      if (noisy) setLoadErr(msg);
+      else setLoadErr((prev) => prev ?? msg);
     } finally {
-      setLoading(false);
+      if (noisy) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void load();
+    void load("full");
   }, [load]);
 
   useEffect(() => {
@@ -72,14 +86,14 @@ export function PromoServersView() {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") {
         return;
       }
-      void load();
+      void load("quiet");
     }, POLL_MS);
     return () => window.clearInterval(id);
   }, [load]);
 
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === "visible") void load();
+      if (document.visibilityState === "visible") void load("quiet");
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
@@ -142,12 +156,28 @@ export function PromoServersView() {
           type="button"
           className={styles.refreshBtn}
           disabled={loading}
-          onClick={() => void load()}
+          onClick={() => void load("full")}
         >
           <RefreshCw size={14} strokeWidth={2} aria-hidden />
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
+
+      {generatedAt ? (
+        <p
+          style={{
+            fontSize: "0.75rem",
+            color: "var(--dash-muted)",
+            margin: "-0.35rem 0 1rem",
+          }}
+        >
+          Catalog refreshed{" "}
+          <time dateTime={new Date(generatedAt).toISOString()}>
+            {new Date(generatedAt).toLocaleString()}
+          </time>
+          .
+        </p>
+      ) : null}
 
       {loadErr ? (
         <p style={{ color: "var(--dash-amber)", marginBottom: "1rem" }} role="alert">
