@@ -132,12 +132,6 @@ export function PromoServersView() {
         >
           Server discovery
         </h1>
-        <p className={styles.lead}>
-          Discord servers where Adzz customers have linked a channel and{" "}
-          <strong>ads are actively posting</strong> right now (paid accounts only).
-          Listings come from <strong>every bot on the platform</strong>, merged by server
-          so you can join communities already running campaigns.
-        </p>
       </header>
 
       <div className={styles.toolbar}>
