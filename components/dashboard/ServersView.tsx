@@ -1635,6 +1635,12 @@ export function ServersView() {
         <h1 className={styles.title}>Server &amp; channel control</h1>
       </header>
 
+      <p className={styles.pageLead}>
+        Newly linked channels are queued for a post within a few seconds (then your
+        interval applies). Make sure your ad copy is saved on{" "}
+        <strong>Messages</strong>.
+      </p>
+
       {loadError ? (
         <p style={{ color: "var(--dash-amber)", marginBottom: "1rem" }}>
           {loadError}
