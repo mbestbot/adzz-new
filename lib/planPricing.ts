@@ -1,4 +1,4 @@
-/** Public support Discord — Robux billing is handled via ticket here */
+/** Public support Discord — Robux billing and trial claims are handled via ticket here */
 export const SUPPORT_DISCORD_URL = "https://discord.gg/adzz";
 
 export const PLAN_LAUNCH_USD = {

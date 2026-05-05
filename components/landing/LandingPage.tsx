@@ -20,6 +20,7 @@ import {
   SUPPORT_DISCORD_URL,
 } from "@/lib/planPricing";
 import styles from "./landing.module.css";
+import { TrialDiscordTicketLine } from "@/components/TrialDiscordTicketLine";
 import { LandingNav } from "./LandingNav";
 
 const FEATURES = [
@@ -332,6 +333,10 @@ export function LandingPage() {
               (see each card). Robux purchases are handled in Discord — open a
               ticket in our server after you join.
             </p>
+            <TrialDiscordTicketLine
+              className={styles.pricingTrialCallout}
+              linkClassName={styles.pricingTrialLink}
+            />
           </div>
           <div className={styles.pricingRow}>
             <div className={styles.pricingSide} aria-hidden>

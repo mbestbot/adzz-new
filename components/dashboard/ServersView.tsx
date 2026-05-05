@@ -549,11 +549,15 @@ export function ServersView() {
       }[];
     };
     const campaigns = data.campaigns ?? [];
-    const pool = msgState?.uiMode === "adpool" ? msgState.adPool : null;
-    const poolHasTargets = (pool?.targets?.length ?? 0) > 0;
+    /** Pool config persists while uiMode is Basic; stats stay on these targets. */
+    const adPoolState = msgState?.adPool ?? null;
+    const poolHasTargets = (adPoolState?.targets?.length ?? 0) > 0;
     const poolHasMessage =
-      Array.isArray(pool?.messages) &&
-      pool.messages.some((m) => String(m ?? "").trim().length > 0);
+      Array.isArray(adPoolState?.messages) &&
+      adPoolState.messages.some((m) => String(m ?? "").trim().length > 0);
+    /** Scheduler only posts from the pool when Messages is on the Ad pool tab. */
+    const poolPostingActive =
+      msgState?.uiMode === "adpool" && poolHasTargets && poolHasMessage;
     const anyEnabled = campaigns.length > 0 || poolHasTargets;
     const running = new Set<string>();
     const paused = new Set<string>();
@@ -581,7 +585,8 @@ export function ServersView() {
         adsSentTotal?: number;
       }[],
       campIntervalSec: number | null,
-      campHasCopy: boolean
+      campHasCopy: boolean,
+      countsAsRunning = true
     ) => {
       for (const t of targets ?? []) {
         if (discordId(t.botId) !== discordId(activeBotId)) continue;
@@ -639,7 +644,7 @@ export function ServersView() {
           }
         }
         if (t.paused) paused.add(chId);
-        else if (campHasCopy) running.add(chId);
+        else if (campHasCopy && countsAsRunning) running.add(chId);
       }
     };
 
@@ -665,14 +670,16 @@ export function ServersView() {
       ingestTargetsForBot(c.targets ?? [], campIntervalSec, campHasMessage);
     }
 
-    if (pool?.targets?.length) {
+    if (adPoolState?.targets?.length) {
       const intervalMs =
-        pool.intervalMs != null ? Number(pool.intervalMs) : Number.NaN;
+        adPoolState.intervalMs != null
+          ? Number(adPoolState.intervalMs)
+          : Number.NaN;
       const campIntervalSec =
         Number.isFinite(intervalMs) && intervalMs > 0
           ? Math.max(1, Math.round(intervalMs / 1000))
           : null;
-      const touchesBot = pool.targets.some(
+      const touchesBot = adPoolState.targets.some(
         (t) => discordId(t.botId) === discordId(activeBotId)
       );
       if (
@@ -682,7 +689,12 @@ export function ServersView() {
       ) {
         globalMinInterval = campIntervalSec;
       }
-      ingestTargetsForBot(pool.targets, campIntervalSec, poolHasMessage);
+      ingestTargetsForBot(
+        adPoolState.targets,
+        campIntervalSec,
+        poolHasMessage,
+        poolPostingActive
+      );
     }
     const guildAdsSent: Record<string, number> = {};
     for (const chId of Object.keys(channelAdsSent)) {

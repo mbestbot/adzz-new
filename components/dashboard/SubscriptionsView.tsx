@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { Crown } from "lucide-react";
 import { apiFetch } from "@/lib/api";
+import { TrialDiscordTicketLine } from "@/components/TrialDiscordTicketLine";
 import {
   PLAN_LAUNCH_USD,
   PLAN_ROBUX_PER_MONTH,
@@ -301,6 +302,11 @@ export function SubscriptionsView() {
           Refresh
         </button>
       </header>
+
+      <TrialDiscordTicketLine
+        className={styles.trialCallout}
+        linkClassName={styles.trialCalloutLink}
+      />
 
       {checkoutNotice === "success" ? (
         <p className={styles.checkoutBannerOk} role="status">

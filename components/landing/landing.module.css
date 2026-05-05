@@ -580,6 +580,34 @@
   color: #a1a1aa;
 }
 
+.pricingTrialCallout {
+  margin: 1.25rem auto 0;
+  max-width: 42rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(88, 28, 135, 0.18);
+  font-size: clamp(0.95rem, 2vw, 1.05rem);
+  font-weight: 500;
+  line-height: 1.55;
+  color: #e4e4e7;
+}
+
+.pricingTrialCallout strong {
+  color: #fafafa;
+}
+
+.pricingTrialLink {
+  color: #d8b4fe;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pricingTrialLink:hover {
+  color: #f0abfc;
+}
+
 /* Features title block (centers with pricingHead) */
 .featuresTitle {
   display: inline-block;

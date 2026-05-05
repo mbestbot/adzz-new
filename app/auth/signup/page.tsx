@@ -14,6 +14,7 @@ import {
 import { useAuth } from "@/components/auth/AuthContext";
 import { DiscordIcon } from "@/components/icons/DiscordIcon";
 import { GoogleIcon } from "@/components/icons/GoogleIcon";
+import { TrialDiscordTicketLine } from "@/components/TrialDiscordTicketLine";
 import { API_BASE } from "@/lib/api";
 import styles from "../auth.module.css";
 
@@ -65,6 +66,11 @@ export default function SignupPage() {
         <p className={styles.lead}>
           Join Adzz and start automating Discord ads from one dashboard.
         </p>
+
+        <TrialDiscordTicketLine
+          className={styles.trialHint}
+          linkClassName={styles.trialHintLink}
+        />
 
         {error ? <div className={styles.error}>{error}</div> : null}
 

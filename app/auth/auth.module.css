@@ -76,6 +76,32 @@
   color: var(--dash-muted);
 }
 
+.trialHint {
+  margin: 0 0 1.35rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.32);
+  background: rgba(88, 28, 135, 0.15);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--dash-muted);
+}
+
+.trialHint strong {
+  color: #e4e4e7;
+}
+
+.trialHintLink {
+  color: #d8b4fe;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.trialHintLink:hover {
+  color: #f0abfc;
+}
+
 .field {
   margin-bottom: 1rem;
 }

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
+import { TrialDiscordTicketLine } from "@/components/TrialDiscordTicketLine";
 import { Sidebar } from "./Sidebar";
 import { useSubscription } from "./SubscriptionContext";
 import styles from "./shell.module.css";
@@ -105,6 +106,10 @@ export function DashboardShell({ children }: { children: ReactNode }) {
                   bots, channels, and campaigns stay saved — subscribe again and
                   everything resumes right away.
                 </p>
+                <TrialDiscordTicketLine
+                  className={styles.subscriptionLockTrial}
+                  linkClassName={styles.subscriptionLockTrialLink}
+                />
                 <div className={styles.subscriptionLockActions}>
                   <Link href="/subscriptions" className={styles.subscriptionLockCta}>
                     View plans

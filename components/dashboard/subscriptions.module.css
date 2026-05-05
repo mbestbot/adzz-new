@@ -508,6 +508,33 @@
   font-size: 0.875rem;
 }
 
+.trialCallout {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--dash-radius-sm);
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: var(--dash-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.trialCallout strong {
+  color: var(--dash-text);
+}
+
+.trialCalloutLink {
+  color: var(--dash-accent-mid);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.trialCalloutLink:hover {
+  color: var(--dash-accent);
+}
+
 .manageCard {
   margin: 0.5rem 0 1.75rem;
   padding: 1.15rem 1.25rem;

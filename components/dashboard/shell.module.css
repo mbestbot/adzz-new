@@ -123,6 +123,28 @@
   color: var(--dash-text);
 }
 
+.subscriptionLockTrial {
+  margin: 0.85rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(228, 228, 231, 0.88);
+}
+
+.subscriptionLockTrial strong {
+  color: #fafafa;
+}
+
+.subscriptionLockTrialLink {
+  color: var(--dash-accent-mid);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.subscriptionLockTrialLink:hover {
+  color: var(--dash-accent);
+}
+
 .subscriptionLockDesc {
   margin: 0 0 1.1rem;
   font-size: 0.9rem;
