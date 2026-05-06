@@ -26,10 +26,40 @@ type RebuildProgress = {
   current: number;
   total: number;
   phase: string | null;
+  /** 1-based — set while Discord invite calls run for that guild (before `current` increments). */
+  workingIndex?: number | null;
+  workingGuildName?: string | null;
   lastGuildName: string | null;
   startedAt: number | null;
   lastError: string | null;
 };
+
+function discoveryInviteProgressPct(p: RebuildProgress): number {
+  const { total, current, workingIndex } = p;
+  if (total <= 0) return 0;
+  const inFlight =
+    workingIndex != null &&
+    workingIndex > current &&
+    workingIndex <= total;
+  const numerator = current + (inFlight ? 0.5 : 0);
+  return Math.min(100, (numerator / total) * 100);
+}
+
+function discoveryProgressTitle(p: RebuildProgress): string {
+  if (p.status === "error") return "Invite fetch failed";
+  if (p.total <= 0) {
+    return p.status === "queued" ? "Queued — starting…" : "Working…";
+  }
+  const { current, total, workingIndex, workingGuildName } = p;
+  const finished = `${current} / ${total} servers finished`;
+  if (workingIndex != null && workingGuildName) {
+    return `${finished} · Resolving “${workingGuildName}” (#${workingIndex})`;
+  }
+  if (workingIndex != null) {
+    return `${finished} · Working on server #${workingIndex}`;
+  }
+  return `${finished}`;
+}
 
 type FetchLinksResponse = {
   ok?: boolean;
@@ -313,13 +343,7 @@ export function PromoServersView() {
         <div className={styles.fetchProgressWrap}>
           <div className={styles.fetchProgressHeader}>
             <span className={styles.fetchProgressTitle}>
-              {fetchProgress.status === "error"
-                ? "Invite fetch failed"
-                : fetchProgress.total > 0
-                  ? `Fetching invites · ${fetchProgress.current} / ${fetchProgress.total} servers`
-                  : fetchProgress.status === "queued"
-                    ? "Queued — starting…"
-                    : "Working…"}
+              {discoveryProgressTitle(fetchProgress)}
             </span>
             {fetchElapsedSec > 0 ? (
               <span className={styles.fetchProgressElapsed}>
@@ -338,9 +362,7 @@ export function PromoServersView() {
             role="progressbar"
             aria-valuenow={
               fetchProgress.total > 0
-                ? Math.round(
-                    (fetchProgress.current / fetchProgress.total) * 100
-                  )
+                ? Math.round(discoveryInviteProgressPct(fetchProgress))
                 : undefined
             }
             aria-valuemin={0}
@@ -351,24 +373,30 @@ export function PromoServersView() {
               style={{
                 width:
                   fetchProgress.total > 0
-                    ? `${Math.min(
-                        100,
-                        (fetchProgress.current / fetchProgress.total) * 100
-                      )}%`
+                    ? `${discoveryInviteProgressPct(fetchProgress)}%`
                     : fetchProgress.status === "error"
                       ? "100%"
                       : "0%",
               }}
             />
           </div>
-          {fetchProgress.lastGuildName ? (
+          {fetchProgress.workingGuildName ? (
             <p className={styles.fetchProgressGuild}>
-              Last processed: {fetchProgress.lastGuildName}
+              Resolving invites for: {fetchProgress.workingGuildName}
+              <span style={{ opacity: 0.85 }}>
+                {" "}
+                (Discord calls per guild — the first one can take a while.)
+              </span>
+            </p>
+          ) : fetchProgress.lastGuildName ? (
+            <p className={styles.fetchProgressGuild}>
+              Last finished: {fetchProgress.lastGuildName}
             </p>
           ) : null}
           <p className={styles.fetchProgressHint}>
-            Each server is one Discord guild in the invite pass. The catalog
-            timestamp updates when the full run finishes saving.
+            “Finished” counts only after each guild’s invite is resolved. The bar
+            moves halfway while a guild is in progress so a long first guild does
+            not look stuck at zero.
           </p>
           {fetchProgress.status === "error" && fetchProgress.lastError ? (
             <p className={styles.fetchProgressErr} role="alert">
