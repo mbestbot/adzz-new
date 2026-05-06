@@ -15,13 +15,41 @@ type PromoLinkItem = {
   id: string;
   url: string;
   code: string;
+  inviteCode?: string;
+  discordGuildId?: string | null;
+  guildIcon?: string | null;
   guildName: string | null;
   approximateMemberCount: number | null;
   valid: boolean;
   expiresAt: number | null;
   addedAt: number;
   updatedAt: number;
+  lastValidationReason?: string | null;
 };
+
+function guildIconUrl(
+  guildId: string | null | undefined,
+  icon: string | null | undefined
+): string | null {
+  if (!guildId || !icon) return null;
+  const ext = icon.startsWith("a_") ? "gif" : "png";
+  return `https://cdn.discordapp.com/icons/${guildId}/${icon}.${ext}?size=128`;
+}
+
+function guildInitial(name: string): string {
+  const t = name.trim();
+  if (!t) return "?";
+  const c = t[0];
+  return /[a-z]/i.test(c) ? c.toUpperCase() : c;
+}
+
+function invalidHint(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  if (reason.startsWith("http_")) {
+    return "Could not verify with Discord — tap Refresh or Replace.";
+  }
+  return null;
+}
 
 export function PromoServersView() {
   const [items, setItems] = useState<PromoLinkItem[]>([]);
@@ -30,7 +58,6 @@ export function PromoServersView() {
   const [addUrl, setAddUrl] = useState("");
   const [addBusy, setAddBusy] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
-  /** Row id -> draft replace URL */
   const [replaceDraft, setReplaceDraft] = useState<Record<string, string>>({});
   const [replacingId, setReplacingId] = useState<string | null>(null);
   const [replaceBusy, setReplaceBusy] = useState<string | null>(null);
@@ -191,8 +218,9 @@ export function PromoServersView() {
             lineHeight: 1.45,
           }}
         >
-          Paste Discord invite URLs (<code className={styles.inlineCode}>discord.gg/…</code>).
-          Duplicates are blocked. Invalid or expired invites show in red — use Replace to update.
+          Paste Discord invite URLs (<code className={styles.inlineCode}>discord.gg/…</code>
+          ). Duplicates are blocked. Cards show the server from Discord; broken invites are
+          highlighted in red.
         </p>
       </header>
 
@@ -247,120 +275,152 @@ export function PromoServersView() {
       ) : null}
 
       {items.length > 0 ? (
-        <ul className={styles.promoList}>
+        <div className={styles.promoGrid}>
           {items.map((row) => {
             const expired = !row.valid;
             const repOpen = replacingId === row.id;
+            const displayName = row.guildName?.trim() || "Discord server";
+            const iconSrc = guildIconUrl(row.discordGuildId, row.guildIcon);
+            const verifyHint = invalidHint(row.lastValidationReason ?? null);
+
             return (
-              <li
+              <article
                 key={row.id}
-                className={`${styles.promoCard} ${expired ? styles.promoCardExpired : ""}`}
+                className={`${styles.promoTile} ${expired ? styles.promoTileExpired : ""}`}
               >
-                <div className={styles.promoCardMain}>
-                  <div className={styles.promoCardText}>
-                    <div className={styles.promoGuildRow}>
-                      <Link2 size={14} strokeWidth={2} aria-hidden />
-                      <span className={styles.promoGuildName}>
-                        {row.guildName ?? "Discord server"}
-                      </span>
-                      {typeof row.approximateMemberCount === "number" ? (
-                        <span className={styles.promoMembers}>
-                          ~{row.approximateMemberCount.toLocaleString()} members
-                        </span>
-                      ) : null}
+                <button
+                  type="button"
+                  className={styles.tileDeleteBtn}
+                  aria-label="Remove link"
+                  onClick={() => void removeLink(row.id)}
+                >
+                  <Trash2 size={15} strokeWidth={2} aria-hidden />
+                </button>
+
+                <div className={styles.iconWrap}>
+                  {iconSrc ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      className={styles.icon}
+                      src={iconSrc}
+                      alt=""
+                      width={52}
+                      height={52}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  ) : (
+                    <div className={styles.iconFallback} aria-hidden>
+                      {guildInitial(displayName)}
                     </div>
-                    <a
-                      className={styles.promoUrl}
-                      href={row.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {row.url}
-                      <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
-                    </a>
-                    <p className={styles.promoMeta}>
-                      {formatExpires(row.expiresAt)}
-                      {expired ? (
-                        <span className={styles.promoExpiredBadge}> Invalid / expired</span>
-                      ) : null}
-                    </p>
-                  </div>
-                  <div className={styles.promoActions}>
-                    <button
-                      type="button"
-                      className={styles.iconGhostBtn}
-                      aria-label="Remove link"
-                      onClick={() => void removeLink(row.id)}
-                    >
-                      <Trash2 size={16} strokeWidth={2} aria-hidden />
-                    </button>
-                  </div>
+                  )}
                 </div>
 
-                {repOpen ? (
-                  <div className={styles.replaceRow}>
-                    <input
-                      type="url"
-                      className={styles.replaceInput}
-                      placeholder="New discord.gg or discord.com/invite/… URL"
-                      value={replaceDraft[row.id] ?? ""}
-                      onChange={(e) =>
+                <h3 className={styles.serverName}>{displayName}</h3>
+                <p className={styles.meta}>
+                  {typeof row.approximateMemberCount === "number" ? (
+                    <>
+                      {row.approximateMemberCount.toLocaleString()} members
+                    </>
+                  ) : (
+                    <span style={{ opacity: 0.75 }}>Member count unavailable</span>
+                  )}
+                </p>
+
+                <a
+                  className={styles.joinBtn}
+                  href={row.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Join server
+                  <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
+                </a>
+
+                <p className={styles.tileInviteUrl}>
+                  <Link2 size={11} strokeWidth={2} aria-hidden />
+                  <span>{row.url}</span>
+                </p>
+
+                <p className={styles.tileSubMeta}>
+                  {formatExpires(row.expiresAt)}
+                  {expired ? (
+                    <span className={styles.promoExpiredBadge}>
+                      {" "}
+                      · Invalid or expired
+                    </span>
+                  ) : null}
+                </p>
+                {expired && verifyHint ? (
+                  <p className={styles.tileVerifyHint}>{verifyHint}</p>
+                ) : null}
+
+                <div className={styles.tileFooter}>
+                  {repOpen ? (
+                    <div className={styles.replaceRow}>
+                      <input
+                        type="url"
+                        className={styles.replaceInput}
+                        placeholder="New invite URL"
+                        value={replaceDraft[row.id] ?? ""}
+                        onChange={(e) =>
+                          setReplaceDraft((d) => ({
+                            ...d,
+                            [row.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") void submitReplace(row.id);
+                        }}
+                        aria-label="Replacement invite URL"
+                      />
+                      <button
+                        type="button"
+                        className={styles.replaceSaveBtn}
+                        disabled={
+                          replaceBusy === row.id ||
+                          !(replaceDraft[row.id] ?? "").trim()
+                        }
+                        onClick={() => void submitReplace(row.id)}
+                      >
+                        {replaceBusy === row.id ? "Saving…" : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.replaceCancelBtn}
+                        disabled={replaceBusy === row.id}
+                        onClick={() => {
+                          setReplacingId(null);
+                          setReplaceDraft((d) => {
+                            const next = { ...d };
+                            delete next[row.id];
+                            return next;
+                          });
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.replaceToggleBtn}
+                      onClick={() => {
+                        setReplacingId(row.id);
                         setReplaceDraft((d) => ({
                           ...d,
-                          [row.id]: e.target.value,
-                        }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") void submitReplace(row.id);
-                      }}
-                      aria-label="Replacement invite URL"
-                    />
-                    <button
-                      type="button"
-                      className={styles.replaceSaveBtn}
-                      disabled={
-                        replaceBusy === row.id ||
-                        !(replaceDraft[row.id] ?? "").trim()
-                      }
-                      onClick={() => void submitReplace(row.id)}
-                    >
-                      {replaceBusy === row.id ? "Saving…" : "Save"}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.replaceCancelBtn}
-                      disabled={replaceBusy === row.id}
-                      onClick={() => {
-                        setReplacingId(null);
-                        setReplaceDraft((d) => {
-                          const next = { ...d };
-                          delete next[row.id];
-                          return next;
-                        });
+                          [row.id]: d[row.id] ?? "",
+                        }));
                       }}
                     >
-                      Cancel
+                      Replace link
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.replaceToggleBtn}
-                    onClick={() => {
-                      setReplacingId(row.id);
-                      setReplaceDraft((d) => ({
-                        ...d,
-                        [row.id]: d[row.id] ?? "",
-                      }));
-                    }}
-                  >
-                    Replace link
-                  </button>
-                )}
-              </li>
+                  )}
+                </div>
+              </article>
             );
           })}
-        </ul>
+        </div>
       ) : loading ? (
         <p className={styles.empty}>Loading…</p>
       ) : null}
