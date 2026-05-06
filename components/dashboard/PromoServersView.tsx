@@ -61,12 +61,15 @@ function discoveryProgressTitle(p: RebuildProgress): string {
   return `${finished}`;
 }
 
-type GuildFetchLinkResponse = {
+type GuildFetchStatusResponse = {
+  status: "none" | "running" | "done";
   ok?: boolean;
   discordGuildId?: string;
+  startedAt?: number;
+  finishedAt?: number;
   joinDiscordUrl?: string | null;
   logs?: string[];
-  error?: string;
+  error?: string | null;
   server?: DiscoveryServer;
   generatedAt?: number;
 };
@@ -87,8 +90,10 @@ const FETCH_LINKS_POST_TIMEOUT_MS = 45_000;
 const FETCH_LINKS_POLL_MS = 3_000;
 const FETCH_LINKS_POLL_MAX_MS = 20 * 60_000;
 const REBUILD_PROGRESS_POLL_MS = 1_000;
-/** Per-guild invite resolution can hit many Discord endpoints (rate limits, etc.). */
-const GUILD_FETCH_LINK_TIMEOUT_MS = 120_000;
+/** POST returns 202 immediately; poll status until Discord work finishes (avoids gateway timeouts). */
+const GUILD_FETCH_POST_TIMEOUT_MS = 45_000;
+const GUILD_FETCH_POLL_MS = 1_500;
+const GUILD_FETCH_POLL_MAX_MS = 20 * 60_000;
 
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
@@ -255,46 +260,118 @@ export function PromoServersView() {
   const fetchLinkForGuild = useCallback(async (guildId: string) => {
     setGuildBusy((b) => ({ ...b, [guildId]: true }));
     try {
-      const res = await apiFetch(
+      const postRes = await apiFetch(
         "/api/discovery/guild-fetch-link",
         {
           method: "POST",
           body: JSON.stringify({ discordGuildId: guildId }),
         },
-        { timeoutMs: GUILD_FETCH_LINK_TIMEOUT_MS }
+        { timeoutMs: GUILD_FETCH_POST_TIMEOUT_MS }
       );
-      const data = (await res.json().catch(() => ({}))) as GuildFetchLinkResponse;
-      const logs = Array.isArray(data.logs) ? data.logs : [];
-      if (!res.ok) {
+      const postData = (await postRes.json().catch(() => ({}))) as {
+        accepted?: boolean;
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!postRes.ok && postRes.status !== 202) {
         setGuildDiag((d) => ({
           ...d,
           [guildId]: {
-            logs,
-            error: data.error ?? `Request failed (${res.status})`,
+            logs: [],
+            error:
+              postData.error ??
+              `Could not start fetch (${postRes.status})`,
           },
         }));
         return;
       }
-      const softErr =
-        !data.joinDiscordUrl
-          ? "No discord.gg link — check the log (bot token, Create Invite permission, or custom URL limits)."
-          : undefined;
+
+      if (postRes.status !== 202) {
+        setGuildDiag((d) => ({
+          ...d,
+          [guildId]: {
+            logs: [],
+            error:
+              postData.error ??
+              `Guild fetch must return HTTP 202 (got ${postRes.status}). Deploy the latest backend.`,
+          },
+        }));
+        return;
+      }
+
+      const deadline = Date.now() + GUILD_FETCH_POLL_MAX_MS;
+      const statusUrl = `/api/discovery/guild-fetch-link/status?discordGuildId=${encodeURIComponent(guildId)}`;
+
+      while (Date.now() < deadline) {
+        const stRes = await apiFetch(
+          statusUrl,
+          {},
+          { quietLog: true, timeoutMs: 60_000 }
+        );
+        const st = (await stRes.json().catch(() => ({}))) as GuildFetchStatusResponse;
+
+        if (!stRes.ok) {
+          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
+          continue;
+        }
+
+        if (st.status === "running") {
+          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
+          continue;
+        }
+
+        if (st.status === "done") {
+          const logs = Array.isArray(st.logs) ? st.logs : [];
+          if (!st.ok) {
+            setGuildDiag((d) => ({
+              ...d,
+              [guildId]: {
+                logs,
+                error: st.error ?? "Invite fetch failed",
+              },
+            }));
+            return;
+          }
+          const softErr =
+            !st.joinDiscordUrl
+              ? "No discord.gg link — check the log (bot token, Create Invite permission, or custom URL limits)."
+              : undefined;
+          setGuildDiag((d) => ({
+            ...d,
+            [guildId]: { logs, error: softErr },
+          }));
+          if (st.server) {
+            setServers((prev) =>
+              prev
+                ? prev.map((s) =>
+                    s.discordGuildId === guildId ? { ...s, ...st.server } : s
+                  )
+                : null
+            );
+          }
+          if (st.generatedAt != null && Number.isFinite(st.generatedAt)) {
+            setGeneratedAt(st.generatedAt);
+          }
+          return;
+        }
+
+        if (st.status === "none") {
+          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
+          continue;
+        }
+
+        await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
+      }
+
       setGuildDiag((d) => ({
         ...d,
-        [guildId]: { logs, error: softErr },
+        [guildId]: {
+          logs: [],
+          error:
+            "Timed out waiting for invite resolution — try again or check server logs.",
+        },
       }));
-      if (data.server) {
-        setServers((prev) =>
-          prev
-            ? prev.map((s) =>
-                s.discordGuildId === guildId ? { ...s, ...data.server } : s
-              )
-            : null
-        );
-      }
-      if (data.generatedAt != null && Number.isFinite(data.generatedAt)) {
-        setGeneratedAt(data.generatedAt);
-      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Fetch failed";
       setGuildDiag((d) => ({
