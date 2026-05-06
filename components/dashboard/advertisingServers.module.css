@@ -98,6 +98,94 @@
   cursor: not-allowed;
 }
 
+.fetchProgressWrap {
+  margin: -0.35rem 0 1.15rem;
+  padding: 0.65rem 0.85rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(18, 12, 28, 0.55);
+}
+
+.fetchProgressHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+}
+
+.fetchProgressTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--dash-text-secondary);
+}
+
+.fetchProgressElapsed {
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--dash-muted);
+}
+
+.fetchProgressTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.fetchProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #7c3aed 0%,
+    #c084fc 50%,
+    #a855f7 100%
+  );
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.35);
+  transition: width 0.25s ease;
+}
+
+.fetchProgressIndeterminate .fetchProgressFill {
+  width: 34% !important;
+  animation: fetchProgressSlide 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes fetchProgressSlide {
+  from {
+    margin-left: 0;
+  }
+  to {
+    margin-left: 66%;
+  }
+}
+
+.fetchProgressGuild {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--dash-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fetchProgressHint {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--dash-muted-2);
+}
+
+.fetchProgressErr {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--dash-amber, #fbbf24);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10.25rem, 1fr));

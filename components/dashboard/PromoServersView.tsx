@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, Link2, RefreshCw, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import styles from "./advertisingServers.module.css";
@@ -21,6 +21,16 @@ type DiscoveryResponse = {
   error?: string;
 };
 
+type RebuildProgress = {
+  status: "idle" | "queued" | "running" | "error";
+  current: number;
+  total: number;
+  phase: string | null;
+  lastGuildName: string | null;
+  startedAt: number | null;
+  lastError: string | null;
+};
+
 type FetchLinksResponse = {
   ok?: boolean;
   accepted?: boolean;
@@ -34,6 +44,7 @@ type FetchLinksResponse = {
 const FETCH_LINKS_POST_TIMEOUT_MS = 45_000;
 const FETCH_LINKS_POLL_MS = 3_000;
 const FETCH_LINKS_POLL_MAX_MS = 20 * 60_000;
+const REBUILD_PROGRESS_POLL_MS = 1_000;
 
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
@@ -64,6 +75,39 @@ export function PromoServersView() {
   const [loading, setLoading] = useState(false);
   const [fetchLinksBusy, setFetchLinksBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [fetchProgress, setFetchProgress] = useState<RebuildProgress | null>(
+    null
+  );
+  const [fetchElapsedSec, setFetchElapsedSec] = useState(0);
+  const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopProgressPoll = useCallback(() => {
+    if (progressPollRef.current != null) {
+      clearInterval(progressPollRef.current);
+      progressPollRef.current = null;
+    }
+  }, []);
+
+  const startProgressPoll = useCallback(() => {
+    stopProgressPoll();
+    progressPollRef.current = setInterval(() => {
+      void (async () => {
+        try {
+          const res = await apiFetch(
+            "/api/discovery/rebuild-progress",
+            {},
+            { quietLog: true }
+          );
+          if (res.ok) {
+            const p = (await res.json().catch(() => ({}))) as RebuildProgress;
+            setFetchProgress(p);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+    }, REBUILD_PROGRESS_POLL_MS);
+  }, [stopProgressPoll]);
 
   const load = useCallback(async (mode: "full" | "quiet" = "full") => {
     const noisy = mode === "full";
@@ -96,6 +140,17 @@ export function PromoServersView() {
   const fetchLinks = useCallback(async () => {
     setFetchLinksBusy(true);
     setLoadErr(null);
+    setFetchProgress({
+      status: "queued",
+      current: 0,
+      total: 0,
+      phase: "queued",
+      lastGuildName: null,
+      startedAt: Date.now(),
+      lastError: null,
+    });
+    setFetchElapsedSec(0);
+    startProgressPoll();
     const baseline = generatedAt ?? 0;
     try {
       const res = await apiFetch(
@@ -132,11 +187,7 @@ export function PromoServersView() {
         const pollData = (await pollRes.json().catch(() => ({}))) as DiscoveryResponse;
         if (!pollRes.ok) continue;
         const ga = pollData.generatedAt;
-        if (
-          ga != null &&
-          Number.isFinite(ga) &&
-          ga > baseline
-        ) {
+        if (ga != null && Number.isFinite(ga) && ga > baseline) {
           setServers(pollData.servers ?? []);
           setGeneratedAt(ga);
           return;
@@ -149,9 +200,25 @@ export function PromoServersView() {
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Fetch links failed");
     } finally {
+      stopProgressPoll();
+      setFetchProgress(null);
       setFetchLinksBusy(false);
     }
-  }, [generatedAt]);
+  }, [generatedAt, startProgressPoll, stopProgressPoll]);
+
+  useEffect(() => {
+    if (!fetchLinksBusy || fetchProgress?.startedAt == null) {
+      setFetchElapsedSec(0);
+      return;
+    }
+    const t0 = fetchProgress.startedAt;
+    const tick = () => {
+      setFetchElapsedSec(Math.max(0, Math.floor((Date.now() - t0) / 1000)));
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [fetchLinksBusy, fetchProgress?.startedAt]);
 
   useEffect(() => {
     void load("full");
@@ -241,6 +308,75 @@ export function PromoServersView() {
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
+
+      {fetchLinksBusy && fetchProgress ? (
+        <div className={styles.fetchProgressWrap}>
+          <div className={styles.fetchProgressHeader}>
+            <span className={styles.fetchProgressTitle}>
+              {fetchProgress.status === "error"
+                ? "Invite fetch failed"
+                : fetchProgress.total > 0
+                  ? `Fetching invites · ${fetchProgress.current} / ${fetchProgress.total} servers`
+                  : fetchProgress.status === "queued"
+                    ? "Queued — starting…"
+                    : "Working…"}
+            </span>
+            {fetchElapsedSec > 0 ? (
+              <span className={styles.fetchProgressElapsed}>
+                {fetchElapsedSec}s
+              </span>
+            ) : null}
+          </div>
+          <div
+            className={`${styles.fetchProgressTrack} ${
+              fetchProgress.total === 0 &&
+              fetchProgress.status !== "error" &&
+              fetchProgress.status !== "idle"
+                ? styles.fetchProgressIndeterminate
+                : ""
+            }`}
+            role="progressbar"
+            aria-valuenow={
+              fetchProgress.total > 0
+                ? Math.round(
+                    (fetchProgress.current / fetchProgress.total) * 100
+                  )
+                : undefined
+            }
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <div
+              className={styles.fetchProgressFill}
+              style={{
+                width:
+                  fetchProgress.total > 0
+                    ? `${Math.min(
+                        100,
+                        (fetchProgress.current / fetchProgress.total) * 100
+                      )}%`
+                    : fetchProgress.status === "error"
+                      ? "100%"
+                      : "0%",
+              }}
+            />
+          </div>
+          {fetchProgress.lastGuildName ? (
+            <p className={styles.fetchProgressGuild}>
+              Last processed: {fetchProgress.lastGuildName}
+            </p>
+          ) : null}
+          <p className={styles.fetchProgressHint}>
+            Each server is one Discord guild in the invite pass. The catalog
+            timestamp updates when the full run finishes saving.
+          </p>
+          {fetchProgress.status === "error" && fetchProgress.lastError ? (
+            <p className={styles.fetchProgressErr} role="alert">
+              {fetchProgress.lastError}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {generatedAt ? (
         <p
