@@ -23,12 +23,17 @@ type DiscoveryResponse = {
 
 type FetchLinksResponse = {
   ok?: boolean;
+  accepted?: boolean;
   servers?: DiscoveryServer[];
   generatedAt?: number | null;
   error?: string;
+  message?: string;
 };
 
-const FETCH_LINKS_TIMEOUT_MS = 600_000;
+/** POST returns 202 quickly; polling waits for snapshot `generatedAt` to advance. */
+const FETCH_LINKS_POST_TIMEOUT_MS = 45_000;
+const FETCH_LINKS_POLL_MS = 3_000;
+const FETCH_LINKS_POLL_MAX_MS = 20 * 60_000;
 
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
@@ -91,28 +96,62 @@ export function PromoServersView() {
   const fetchLinks = useCallback(async () => {
     setFetchLinksBusy(true);
     setLoadErr(null);
+    const baseline = generatedAt ?? 0;
     try {
       const res = await apiFetch(
         "/api/discovery/fetch-links",
         { method: "POST", body: JSON.stringify({}) },
-        { timeoutMs: FETCH_LINKS_TIMEOUT_MS }
+        { timeoutMs: FETCH_LINKS_POST_TIMEOUT_MS }
       );
       const data = (await res.json().catch(() => ({}))) as FetchLinksResponse;
+
+      if (
+        res.ok &&
+        Array.isArray(data.servers) &&
+        data.generatedAt != null &&
+        res.status !== 202 &&
+        data.accepted !== true
+      ) {
+        setServers(data.servers);
+        setGeneratedAt(
+          Number.isFinite(data.generatedAt) ? data.generatedAt : null
+        );
+        return;
+      }
+
       if (!res.ok) {
         throw new Error(data.error ?? `Fetch links failed (${res.status})`);
       }
-      setServers(data.servers ?? []);
-      setGeneratedAt(
-        data.generatedAt != null && Number.isFinite(data.generatedAt)
-          ? data.generatedAt
-          : null
+
+      const start = Date.now();
+      while (Date.now() - start < FETCH_LINKS_POLL_MAX_MS) {
+        await new Promise((r) => setTimeout(r, FETCH_LINKS_POLL_MS));
+        const pollRes = await apiFetch("/api/discovery/posting-servers", {}, {
+          quietLog: true,
+        });
+        const pollData = (await pollRes.json().catch(() => ({}))) as DiscoveryResponse;
+        if (!pollRes.ok) continue;
+        const ga = pollData.generatedAt;
+        if (
+          ga != null &&
+          Number.isFinite(ga) &&
+          ga > baseline
+        ) {
+          setServers(pollData.servers ?? []);
+          setGeneratedAt(ga);
+          return;
+        }
+      }
+
+      throw new Error(
+        "Timed out waiting for invite rebuild — try Refresh in a minute or check API logs."
       );
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Fetch links failed");
     } finally {
       setFetchLinksBusy(false);
     }
-  }, []);
+  }, [generatedAt]);
 
   useEffect(() => {
     void load("full");
