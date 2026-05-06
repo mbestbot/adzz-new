@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ExternalLink, RefreshCw, Search } from "lucide-react";
+import { ExternalLink, Link2, RefreshCw, Search } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import styles from "./advertisingServers.module.css";
 
@@ -11,7 +11,8 @@ type DiscoveryServer = {
   icon: string | null;
   approximateMemberCount: number;
   updatedAt: number;
-  openInDiscordUrl: string;
+  /** discord.gg invite — discovery never uses channel deep links */
+  joinDiscordUrl?: string;
 };
 
 type DiscoveryResponse = {
@@ -19,6 +20,15 @@ type DiscoveryResponse = {
   generatedAt?: number | null;
   error?: string;
 };
+
+type FetchLinksResponse = {
+  ok?: boolean;
+  servers?: DiscoveryServer[];
+  generatedAt?: number | null;
+  error?: string;
+};
+
+const FETCH_LINKS_TIMEOUT_MS = 600_000;
 
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
@@ -47,6 +57,7 @@ export function PromoServersView() {
   const [generatedAt, setGeneratedAt] = useState<number | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [fetchLinksBusy, setFetchLinksBusy] = useState(false);
   const [query, setQuery] = useState("");
 
   const load = useCallback(async (mode: "full" | "quiet" = "full") => {
@@ -74,6 +85,32 @@ export function PromoServersView() {
       else setLoadErr((prev) => prev ?? msg);
     } finally {
       if (noisy) setLoading(false);
+    }
+  }, []);
+
+  const fetchLinks = useCallback(async () => {
+    setFetchLinksBusy(true);
+    setLoadErr(null);
+    try {
+      const res = await apiFetch(
+        "/api/discovery/fetch-links",
+        { method: "POST", body: JSON.stringify({}) },
+        { timeoutMs: FETCH_LINKS_TIMEOUT_MS }
+      );
+      const data = (await res.json().catch(() => ({}))) as FetchLinksResponse;
+      if (!res.ok) {
+        throw new Error(data.error ?? `Fetch links failed (${res.status})`);
+      }
+      setServers(data.servers ?? []);
+      setGeneratedAt(
+        data.generatedAt != null && Number.isFinite(data.generatedAt)
+          ? data.generatedAt
+          : null
+      );
+    } catch (e) {
+      setLoadErr(e instanceof Error ? e.message : "Fetch links failed");
+    } finally {
+      setFetchLinksBusy(false);
     }
   }, []);
 
@@ -148,8 +185,17 @@ export function PromoServersView() {
         </div>
         <button
           type="button"
+          className={styles.fetchLinksBtn}
+          disabled={loading || fetchLinksBusy}
+          onClick={() => void fetchLinks()}
+        >
+          <Link2 size={14} strokeWidth={2} aria-hidden />
+          {fetchLinksBusy ? "Fetching links…" : "Fetch links"}
+        </button>
+        <button
+          type="button"
           className={styles.refreshBtn}
-          disabled={loading}
+          disabled={loading || fetchLinksBusy}
           onClick={() => void load("full")}
         >
           <RefreshCw size={14} strokeWidth={2} aria-hidden />
@@ -215,15 +261,24 @@ export function PromoServersView() {
                 <p className={styles.meta}>
                   {r.approximateMemberCount.toLocaleString()} members
                 </p>
-                <a
-                  className={styles.openLink}
-                  href={r.openInDiscordUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Open in Discord
-                  <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
-                </a>
+                {r.joinDiscordUrl ? (
+                  <a
+                    className={styles.openLink}
+                    href={r.joinDiscordUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Join server
+                    <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
+                  </a>
+                ) : (
+                  <span
+                    className={styles.joinUnavailable}
+                    title="No invite link yet — the posting bot needs Manage Server or Create Invite on this guild."
+                  >
+                    Invite unavailable
+                  </span>
+                )}
               </article>
             );
           })}

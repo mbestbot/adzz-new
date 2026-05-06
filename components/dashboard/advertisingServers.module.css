@@ -64,6 +64,40 @@
   cursor: not-allowed;
 }
 
+.fetchLinksBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  background: linear-gradient(
+    135deg,
+    rgba(124, 58, 237, 0.35) 0%,
+    rgba(98, 40, 215, 0.28) 100%
+  );
+  color: #f5f3ff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    filter 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.fetchLinksBtn:hover:not(:disabled) {
+  border-color: rgba(216, 180, 254, 0.65);
+  filter: brightness(1.06);
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.28);
+}
+
+.fetchLinksBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10.25rem, 1fr));
@@ -162,6 +196,24 @@
 
 .openLink:hover {
   background: rgba(124, 58, 237, 0.38);
+}
+
+.joinUnavailable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin-top: auto;
+  padding: 0.32rem 0.4rem;
+  border-radius: 8px;
+  border: 1px dashed rgba(167, 139, 250, 0.28);
+  background: rgba(18, 14, 28, 0.65);
+  color: var(--dash-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: default;
 }
 
 .empty {
