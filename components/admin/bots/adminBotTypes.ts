@@ -1,3 +1,5 @@
+export type AdminBotTokenStatus = "ok" | "invalid" | "unknown" | "error";
+
 export type AdminBotRow = {
   id: string;
   userId: string;
@@ -11,9 +13,24 @@ export type AdminBotRow = {
   egressHostPort: string | null;
   egressSlotIndex: number | null;
   adsPostedTotal: number;
+  tokenStatus: AdminBotTokenStatus;
+  tokenCheckedAt: number | null;
+  tokenCheckHttp: number | null;
+  tokenCheckError: string | null;
 };
 
 export type AdminBotsListResponse = { bots: AdminBotRow[] };
+
+export type AdminBotsVerifyResponse = {
+  ok: boolean;
+  checked: number;
+  bots: AdminBotRow[];
+};
+
+export type AdminBotVerifyOneResponse = {
+  ok: boolean;
+  bot: AdminBotRow | null;
+};
 
 export type AdminBotDetail = {
   id: string;
