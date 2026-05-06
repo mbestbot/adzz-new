@@ -79,7 +79,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           onClick={close}
         >
           <LayoutGrid size={18} strokeWidth={2} />
-          <span>Server discovery</span>
+          <span>Invite links</span>
         </Link>
 
         <Link

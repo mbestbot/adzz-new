@@ -1,434 +1,160 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, Link2, RefreshCw, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ExternalLink,
+  Link2,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import styles from "./advertisingServers.module.css";
 
-type DiscoveryServer = {
-  discordGuildId: string;
-  name: string;
-  icon: string | null;
-  approximateMemberCount: number;
+type PromoLinkItem = {
+  id: string;
+  url: string;
+  code: string;
+  guildName: string | null;
+  approximateMemberCount: number | null;
+  valid: boolean;
+  expiresAt: number | null;
+  addedAt: number;
   updatedAt: number;
-  /** discord.gg invite — discovery never uses channel deep links */
-  joinDiscordUrl?: string;
 };
-
-type DiscoveryResponse = {
-  servers?: DiscoveryServer[];
-  generatedAt?: number | null;
-  error?: string;
-};
-
-type RebuildProgress = {
-  status: "idle" | "queued" | "running" | "error";
-  current: number;
-  total: number;
-  phase: string | null;
-  /** 1-based — set while Discord invite calls run for that guild (before `current` increments). */
-  workingIndex?: number | null;
-  workingGuildName?: string | null;
-  lastGuildName: string | null;
-  startedAt: number | null;
-  lastError: string | null;
-};
-
-function discoveryInviteProgressPct(p: RebuildProgress): number {
-  const { total, current, workingIndex } = p;
-  if (total <= 0) return 0;
-  const inFlight =
-    workingIndex != null &&
-    workingIndex > current &&
-    workingIndex <= total;
-  const numerator = current + (inFlight ? 0.5 : 0);
-  return Math.min(100, (numerator / total) * 100);
-}
-
-function discoveryProgressTitle(p: RebuildProgress): string {
-  if (p.status === "error") return "Invite fetch failed";
-  if (p.total <= 0) {
-    return p.status === "queued" ? "Queued — starting…" : "Working…";
-  }
-  const { current, total, workingIndex, workingGuildName } = p;
-  const finished = `${current} / ${total} servers finished`;
-  if (workingIndex != null && workingGuildName) {
-    return `${finished} · Resolving “${workingGuildName}” (#${workingIndex})`;
-  }
-  if (workingIndex != null) {
-    return `${finished} · Working on server #${workingIndex}`;
-  }
-  return `${finished}`;
-}
-
-type GuildFetchStatusResponse = {
-  status: "none" | "running" | "done";
-  ok?: boolean;
-  discordGuildId?: string;
-  startedAt?: number;
-  finishedAt?: number;
-  joinDiscordUrl?: string | null;
-  logs?: string[];
-  error?: string | null;
-  server?: DiscoveryServer;
-  generatedAt?: number;
-};
-
-type GuildDiag = { logs: string[]; error?: string };
-
-type FetchLinksResponse = {
-  ok?: boolean;
-  accepted?: boolean;
-  servers?: DiscoveryServer[];
-  generatedAt?: number | null;
-  error?: string;
-  message?: string;
-};
-
-/** POST returns 202 quickly; polling waits for snapshot `generatedAt` to advance. */
-const FETCH_LINKS_POST_TIMEOUT_MS = 45_000;
-const FETCH_LINKS_POLL_MS = 3_000;
-const FETCH_LINKS_POLL_MAX_MS = 20 * 60_000;
-const REBUILD_PROGRESS_POLL_MS = 1_000;
-/** POST returns 202 immediately; poll status until Discord work finishes (avoids gateway timeouts). */
-const GUILD_FETCH_POST_TIMEOUT_MS = 45_000;
-const GUILD_FETCH_POLL_MS = 1_500;
-const GUILD_FETCH_POLL_MAX_MS = 20 * 60_000;
-
-function guildIconUrl(guildId: string, icon: string | null): string | null {
-  if (!icon) return null;
-  const ext = icon.startsWith("a_") ? "gif" : "png";
-  return `https://cdn.discordapp.com/icons/${guildId}/${icon}.${ext}?size=128`;
-}
-
-function guildInitial(name: string): string {
-  const t = name.trim();
-  if (!t) return "?";
-  const c = t[0];
-  return /[a-z]/i.test(c) ? c.toUpperCase() : c;
-}
-
-function rowMatchesQuery(r: DiscoveryServer, q: string): boolean {
-  if (!q) return true;
-  if (r.name.toLowerCase().includes(q)) return true;
-  if (r.discordGuildId.toLowerCase().includes(q)) return true;
-  return false;
-}
-
-const POLL_MS = 60_000;
 
 export function PromoServersView() {
-  const [servers, setServers] = useState<DiscoveryServer[] | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<number | null>(null);
+  const [items, setItems] = useState<PromoLinkItem[]>([]);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [fetchLinksBusy, setFetchLinksBusy] = useState(false);
-  const [query, setQuery] = useState("");
-  const [fetchProgress, setFetchProgress] = useState<RebuildProgress | null>(
-    null
-  );
-  const [fetchElapsedSec, setFetchElapsedSec] = useState(0);
-  const [guildBusy, setGuildBusy] = useState<Record<string, boolean>>({});
-  const [guildDiag, setGuildDiag] = useState<Record<string, GuildDiag>>({});
-  const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [addUrl, setAddUrl] = useState("");
+  const [addBusy, setAddBusy] = useState(false);
+  const [addErr, setAddErr] = useState<string | null>(null);
+  /** Row id -> draft replace URL */
+  const [replaceDraft, setReplaceDraft] = useState<Record<string, string>>({});
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [replaceBusy, setReplaceBusy] = useState<string | null>(null);
 
-  const stopProgressPoll = useCallback(() => {
-    if (progressPollRef.current != null) {
-      clearInterval(progressPollRef.current);
-      progressPollRef.current = null;
-    }
-  }, []);
-
-  const startProgressPoll = useCallback(() => {
-    stopProgressPoll();
-    progressPollRef.current = setInterval(() => {
-      void (async () => {
-        try {
-          const res = await apiFetch(
-            "/api/discovery/rebuild-progress",
-            {},
-            { quietLog: true }
-          );
-          if (res.ok) {
-            const p = (await res.json().catch(() => ({}))) as RebuildProgress;
-            setFetchProgress(p);
-          }
-        } catch {
-          /* ignore */
-        }
-      })();
-    }, REBUILD_PROGRESS_POLL_MS);
-  }, [stopProgressPoll]);
-
-  const load = useCallback(async (mode: "full" | "quiet" = "full") => {
-    const noisy = mode === "full";
-    if (noisy) {
-      setLoadErr(null);
-      setLoading(true);
-    }
+  const load = useCallback(async () => {
+    setLoadErr(null);
+    setLoading(true);
     try {
-      const res = await apiFetch("/api/discovery/posting-servers");
-      const data = (await res.json().catch(() => ({}))) as DiscoveryResponse;
+      const res = await apiFetch("/api/promo-links");
+      const data = (await res.json().catch(() => ({}))) as {
+        items?: PromoLinkItem[];
+        error?: string;
+      };
       if (!res.ok) {
         throw new Error(data.error ?? `Load failed (${res.status})`);
       }
-      setServers(data.servers ?? []);
-      setGeneratedAt(
-        data.generatedAt != null && Number.isFinite(data.generatedAt)
-          ? data.generatedAt
-          : null
-      );
-      setLoadErr(null);
+      setItems(Array.isArray(data.items) ? data.items : []);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Could not load servers";
-      if (noisy) setLoadErr(msg);
-      else setLoadErr((prev) => prev ?? msg);
+      setLoadErr(e instanceof Error ? e.message : "Could not load links");
     } finally {
-      if (noisy) setLoading(false);
+      setLoading(false);
     }
   }, []);
 
-  const fetchLinks = useCallback(async () => {
-    setFetchLinksBusy(true);
-    setLoadErr(null);
-    setFetchProgress({
-      status: "queued",
-      current: 0,
-      total: 0,
-      phase: "queued",
-      lastGuildName: null,
-      startedAt: Date.now(),
-      lastError: null,
-    });
-    setFetchElapsedSec(0);
-    startProgressPoll();
-    const baseline = generatedAt ?? 0;
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const submitAdd = useCallback(async () => {
+    const raw = addUrl.trim();
+    if (!raw) return;
+    setAddBusy(true);
+    setAddErr(null);
     try {
-      const res = await apiFetch(
-        "/api/discovery/fetch-links",
-        { method: "POST", body: JSON.stringify({}) },
-        { timeoutMs: FETCH_LINKS_POST_TIMEOUT_MS }
-      );
-      const data = (await res.json().catch(() => ({}))) as FetchLinksResponse;
-
-      if (
-        res.ok &&
-        Array.isArray(data.servers) &&
-        data.generatedAt != null &&
-        res.status !== 202 &&
-        data.accepted !== true
-      ) {
-        setServers(data.servers);
-        setGeneratedAt(
-          Number.isFinite(data.generatedAt) ? data.generatedAt : null
-        );
-        return;
-      }
-
-      if (!res.ok) {
-        throw new Error(data.error ?? `Fetch links failed (${res.status})`);
-      }
-
-      const start = Date.now();
-      while (Date.now() - start < FETCH_LINKS_POLL_MAX_MS) {
-        await new Promise((r) => setTimeout(r, FETCH_LINKS_POLL_MS));
-        const pollRes = await apiFetch("/api/discovery/posting-servers", {}, {
-          quietLog: true,
-        });
-        const pollData = (await pollRes.json().catch(() => ({}))) as DiscoveryResponse;
-        if (!pollRes.ok) continue;
-        const ga = pollData.generatedAt;
-        if (ga != null && Number.isFinite(ga) && ga > baseline) {
-          setServers(pollData.servers ?? []);
-          setGeneratedAt(ga);
-          return;
-        }
-      }
-
-      throw new Error(
-        "Timed out waiting for invite rebuild — try Refresh in a minute or check API logs."
-      );
-    } catch (e) {
-      setLoadErr(e instanceof Error ? e.message : "Fetch links failed");
-    } finally {
-      stopProgressPoll();
-      setFetchProgress(null);
-      setFetchLinksBusy(false);
-    }
-  }, [generatedAt, startProgressPoll, stopProgressPoll]);
-
-  const fetchLinkForGuild = useCallback(async (guildId: string) => {
-    setGuildBusy((b) => ({ ...b, [guildId]: true }));
-    try {
-      const postRes = await apiFetch(
-        "/api/discovery/guild-fetch-link",
-        {
-          method: "POST",
-          body: JSON.stringify({ discordGuildId: guildId }),
-        },
-        { timeoutMs: GUILD_FETCH_POST_TIMEOUT_MS }
-      );
-      const postData = (await postRes.json().catch(() => ({}))) as {
-        accepted?: boolean;
-        ok?: boolean;
-        error?: string;
-      };
-
-      if (!postRes.ok && postRes.status !== 202) {
-        setGuildDiag((d) => ({
-          ...d,
-          [guildId]: {
-            logs: [],
-            error:
-              postData.error ??
-              `Could not start fetch (${postRes.status})`,
-          },
-        }));
-        return;
-      }
-
-      if (postRes.status !== 202) {
-        setGuildDiag((d) => ({
-          ...d,
-          [guildId]: {
-            logs: [],
-            error:
-              postData.error ??
-              `Guild fetch must return HTTP 202 (got ${postRes.status}). Deploy the latest backend.`,
-          },
-        }));
-        return;
-      }
-
-      const deadline = Date.now() + GUILD_FETCH_POLL_MAX_MS;
-      const statusUrl = `/api/discovery/guild-fetch-link/status?discordGuildId=${encodeURIComponent(guildId)}`;
-
-      while (Date.now() < deadline) {
-        const stRes = await apiFetch(
-          statusUrl,
-          {},
-          { quietLog: true, timeoutMs: 60_000 }
-        );
-        const st = (await stRes.json().catch(() => ({}))) as GuildFetchStatusResponse;
-
-        if (!stRes.ok) {
-          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
-          continue;
-        }
-
-        if (st.status === "running") {
-          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
-          continue;
-        }
-
-        if (st.status === "done") {
-          const logs = Array.isArray(st.logs) ? st.logs : [];
-          if (!st.ok) {
-            setGuildDiag((d) => ({
-              ...d,
-              [guildId]: {
-                logs,
-                error: st.error ?? "Invite fetch failed",
-              },
-            }));
-            return;
-          }
-          const softErr =
-            !st.joinDiscordUrl
-              ? "No discord.gg link — check the log (bot token, Create Invite permission, or custom URL limits)."
-              : undefined;
-          setGuildDiag((d) => ({
-            ...d,
-            [guildId]: { logs, error: softErr },
-          }));
-          if (st.server) {
-            setServers((prev) =>
-              prev
-                ? prev.map((s) =>
-                    s.discordGuildId === guildId ? { ...s, ...st.server } : s
-                  )
-                : null
-            );
-          }
-          if (st.generatedAt != null && Number.isFinite(st.generatedAt)) {
-            setGeneratedAt(st.generatedAt);
-          }
-          return;
-        }
-
-        if (st.status === "none") {
-          await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
-          continue;
-        }
-
-        await new Promise((r) => setTimeout(r, GUILD_FETCH_POLL_MS));
-      }
-
-      setGuildDiag((d) => ({
-        ...d,
-        [guildId]: {
-          logs: [],
-          error:
-            "Timed out waiting for invite resolution — try again or check server logs.",
-        },
-      }));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Fetch failed";
-      setGuildDiag((d) => ({
-        ...d,
-        [guildId]: { logs: [], error: msg },
-      }));
-    } finally {
-      setGuildBusy((b) => {
-        const next = { ...b };
-        delete next[guildId];
-        return next;
+      const res = await apiFetch("/api/promo-links", {
+        method: "POST",
+        body: JSON.stringify({ url: raw }),
       });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!fetchLinksBusy || fetchProgress?.startedAt == null) {
-      setFetchElapsedSec(0);
-      return;
-    }
-    const t0 = fetchProgress.startedAt;
-    const tick = () => {
-      setFetchElapsedSec(Math.max(0, Math.floor((Date.now() - t0) / 1000)));
-    };
-    tick();
-    const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, [fetchLinksBusy, fetchProgress?.startedAt]);
-
-  useEffect(() => {
-    void load("full");
-  }, [load]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        message?: string;
+        item?: PromoLinkItem;
+      };
+      if (res.status === 409) {
+        setAddErr(data.message ?? "That invite is already in your list.");
         return;
       }
-      void load("quiet");
-    }, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [load]);
+      if (!res.ok) {
+        throw new Error(
+          data.message ?? data.error ?? `Add failed (${res.status})`
+        );
+      }
+      setAddUrl("");
+      await load();
+    } catch (e) {
+      setAddErr(e instanceof Error ? e.message : "Add failed");
+    } finally {
+      setAddBusy(false);
+    }
+  }, [addUrl, load]);
 
-  useEffect(() => {
-    const onVis = () => {
-      if (document.visibilityState === "visible") void load("quiet");
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, [load]);
+  const submitReplace = useCallback(
+    async (id: string) => {
+      const raw = (replaceDraft[id] ?? "").trim();
+      if (!raw) return;
+      setReplaceBusy(id);
+      setLoadErr(null);
+      try {
+        const res = await apiFetch(`/api/promo-links/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ url: raw }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        if (res.status === 409) {
+          setLoadErr(data.message ?? "That invite is already used.");
+          return;
+        }
+        if (!res.ok) {
+          throw new Error(
+            data.message ?? data.error ?? `Replace failed (${res.status})`
+          );
+        }
+        setReplacingId(null);
+        setReplaceDraft((d) => {
+          const next = { ...d };
+          delete next[id];
+          return next;
+        });
+        await load();
+      } catch (e) {
+        setLoadErr(e instanceof Error ? e.message : "Replace failed");
+      } finally {
+        setReplaceBusy(null);
+      }
+    },
+    [replaceDraft, load]
+  );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!servers) return [];
-    if (!q) return servers;
-    return servers.filter((r) => rowMatchesQuery(r, q));
-  }, [servers, query]);
+  const removeLink = useCallback(
+    async (id: string) => {
+      try {
+        const res = await apiFetch(`/api/promo-links/${encodeURIComponent(id)}`, {
+          method: "DELETE",
+        });
+        if (!res.ok && res.status !== 204) {
+          throw new Error(`Remove failed (${res.status})`);
+        }
+        await load();
+      } catch (e) {
+        setLoadErr(e instanceof Error ? e.message : "Remove failed");
+      }
+    },
+    [load]
+  );
+
+  function formatExpires(exp: number | null): string {
+    if (exp == null) return "Never expires";
+    const d = new Date(exp);
+    if (Number.isNaN(d.getTime())) return "";
+    return `Expires ${d.toLocaleString()}`;
+  }
 
   return (
     <div className={styles.wrap}>
@@ -443,7 +169,7 @@ export function PromoServersView() {
             margin: "0 0 0.35rem",
           }}
         >
-          Discovery
+          Promo
         </p>
         <h1
           style={{
@@ -454,220 +180,189 @@ export function PromoServersView() {
             color: "var(--dash-text)",
           }}
         >
-          Server discovery
+          Invite links
         </h1>
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.8125rem",
+            color: "var(--dash-muted)",
+            maxWidth: "36rem",
+            lineHeight: 1.45,
+          }}
+        >
+          Paste Discord invite URLs (<code className={styles.inlineCode}>discord.gg/…</code>).
+          Duplicates are blocked. Invalid or expired invites show in red — use Replace to update.
+        </p>
       </header>
 
       <div className={styles.toolbar}>
-        <div className={styles.searchWrap}>
-          <Search size={16} strokeWidth={2} aria-hidden />
-          <input
-            type="search"
-            className={styles.searchInput}
-            placeholder="Search by server name or guild id…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search discovery servers"
-          />
-        </div>
+        <input
+          type="url"
+          className={styles.addInput}
+          placeholder="https://discord.gg/your-invite"
+          value={addUrl}
+          onChange={(e) => setAddUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submitAdd();
+          }}
+          aria-label="Discord invite URL"
+        />
         <button
           type="button"
-          className={styles.fetchLinksBtn}
-          disabled={loading || fetchLinksBusy}
-          onClick={() => void fetchLinks()}
+          className={styles.addBtn}
+          disabled={loading || addBusy || !addUrl.trim()}
+          onClick={() => void submitAdd()}
         >
-          <Link2 size={14} strokeWidth={2} aria-hidden />
-          {fetchLinksBusy ? "Fetching links…" : "Fetch links"}
+          <Plus size={16} strokeWidth={2.25} aria-hidden />
+          {addBusy ? "Adding…" : "Add link"}
         </button>
         <button
           type="button"
           className={styles.refreshBtn}
-          disabled={loading || fetchLinksBusy}
-          onClick={() => void load("full")}
+          disabled={loading}
+          onClick={() => void load()}
         >
           <RefreshCw size={14} strokeWidth={2} aria-hidden />
           {loading ? "Refreshing…" : "Refresh"}
         </button>
       </div>
 
-      {fetchLinksBusy && fetchProgress ? (
-        <div className={styles.fetchProgressWrap}>
-          <div className={styles.fetchProgressHeader}>
-            <span className={styles.fetchProgressTitle}>
-              {discoveryProgressTitle(fetchProgress)}
-            </span>
-            {fetchElapsedSec > 0 ? (
-              <span className={styles.fetchProgressElapsed}>
-                {fetchElapsedSec}s
-              </span>
-            ) : null}
-          </div>
-          <div
-            className={`${styles.fetchProgressTrack} ${
-              fetchProgress.total === 0 &&
-              fetchProgress.status !== "error" &&
-              fetchProgress.status !== "idle"
-                ? styles.fetchProgressIndeterminate
-                : ""
-            }`}
-            role="progressbar"
-            aria-valuenow={
-              fetchProgress.total > 0
-                ? Math.round(discoveryInviteProgressPct(fetchProgress))
-                : undefined
-            }
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
-            <div
-              className={styles.fetchProgressFill}
-              style={{
-                width:
-                  fetchProgress.total > 0
-                    ? `${discoveryInviteProgressPct(fetchProgress)}%`
-                    : fetchProgress.status === "error"
-                      ? "100%"
-                      : "0%",
-              }}
-            />
-          </div>
-          {fetchProgress.workingGuildName ? (
-            <p className={styles.fetchProgressGuild}>
-              Resolving invites for: {fetchProgress.workingGuildName}
-              <span style={{ opacity: 0.85 }}>
-                {" "}
-                (Discord calls per guild — the first one can take a while.)
-              </span>
-            </p>
-          ) : fetchProgress.lastGuildName ? (
-            <p className={styles.fetchProgressGuild}>
-              Last finished: {fetchProgress.lastGuildName}
-            </p>
-          ) : null}
-          <p className={styles.fetchProgressHint}>
-            “Finished” counts only after each guild’s invite is resolved. The bar
-            moves halfway while a guild is in progress so a long first guild does
-            not look stuck at zero.
-          </p>
-          {fetchProgress.status === "error" && fetchProgress.lastError ? (
-            <p className={styles.fetchProgressErr} role="alert">
-              {fetchProgress.lastError}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {generatedAt ? (
-        <p
-          style={{
-            fontSize: "0.75rem",
-            color: "var(--dash-muted)",
-            margin: "-0.35rem 0 1rem",
-          }}
-        >
-          Catalog refreshed{" "}
-          <time dateTime={new Date(generatedAt).toISOString()}>
-            {new Date(generatedAt).toLocaleString()}
-          </time>
-          .
+      {addErr ? (
+        <p className={styles.bannerErr} role="alert">
+          {addErr}
         </p>
       ) : null}
 
       {loadErr ? (
-        <p style={{ color: "var(--dash-amber)", marginBottom: "1rem" }} role="alert">
+        <p className={styles.bannerErr} role="alert">
           {loadErr}
         </p>
       ) : null}
 
-      {!loading && servers !== null && filtered.length === 0 ? (
+      {!loading && items.length === 0 && !loadErr ? (
         <p className={styles.empty}>
-          {servers.length === 0
-            ? "No active posting servers to show yet — when customers link channels and campaigns run, those Discord guilds appear here."
-            : "No servers match your search."}
+          No links yet — paste a discord.gg invite above.
         </p>
       ) : null}
 
-      {filtered.length > 0 ? (
-        <div className={styles.grid}>
-          {filtered.map((r) => {
-            const iconSrc = guildIconUrl(r.discordGuildId, r.icon);
-            const busyOne = Boolean(guildBusy[r.discordGuildId]);
-            const diag = guildDiag[r.discordGuildId];
+      {items.length > 0 ? (
+        <ul className={styles.promoList}>
+          {items.map((row) => {
+            const expired = !row.valid;
+            const repOpen = replacingId === row.id;
             return (
-              <article key={r.discordGuildId} className={styles.card}>
-                <div className={styles.iconWrap}>
-                  {iconSrc ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      className={styles.icon}
-                      src={iconSrc}
-                      alt=""
-                      width={52}
-                      height={52}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  ) : (
-                    <div className={styles.iconFallback} aria-hidden>
-                      {guildInitial(r.name)}
+              <li
+                key={row.id}
+                className={`${styles.promoCard} ${expired ? styles.promoCardExpired : ""}`}
+              >
+                <div className={styles.promoCardMain}>
+                  <div className={styles.promoCardText}>
+                    <div className={styles.promoGuildRow}>
+                      <Link2 size={14} strokeWidth={2} aria-hidden />
+                      <span className={styles.promoGuildName}>
+                        {row.guildName ?? "Discord server"}
+                      </span>
+                      {typeof row.approximateMemberCount === "number" ? (
+                        <span className={styles.promoMembers}>
+                          ~{row.approximateMemberCount.toLocaleString()} members
+                        </span>
+                      ) : null}
                     </div>
-                  )}
-                </div>
-                <h3 className={styles.serverName}>{r.name}</h3>
-                <p className={styles.meta}>
-                  {r.approximateMemberCount.toLocaleString()} members
-                </p>
-                <div className={styles.cardFooter}>
-                  {r.joinDiscordUrl ? (
                     <a
-                      className={styles.openLink}
-                      href={r.joinDiscordUrl}
+                      className={styles.promoUrl}
+                      href={row.url}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Join server
+                      {row.url}
                       <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
                     </a>
-                  ) : (
-                    <span
-                      className={styles.joinUnavailable}
-                      title="No invite link yet — the posting bot needs Manage Server or Create Invite on this guild."
+                    <p className={styles.promoMeta}>
+                      {formatExpires(row.expiresAt)}
+                      {expired ? (
+                        <span className={styles.promoExpiredBadge}> Invalid / expired</span>
+                      ) : null}
+                    </p>
+                  </div>
+                  <div className={styles.promoActions}>
+                    <button
+                      type="button"
+                      className={styles.iconGhostBtn}
+                      aria-label="Remove link"
+                      onClick={() => void removeLink(row.id)}
                     >
-                      Invite unavailable
-                    </span>
-                  )}
+                      <Trash2 size={16} strokeWidth={2} aria-hidden />
+                    </button>
+                  </div>
+                </div>
+
+                {repOpen ? (
+                  <div className={styles.replaceRow}>
+                    <input
+                      type="url"
+                      className={styles.replaceInput}
+                      placeholder="New discord.gg or discord.com/invite/… URL"
+                      value={replaceDraft[row.id] ?? ""}
+                      onChange={(e) =>
+                        setReplaceDraft((d) => ({
+                          ...d,
+                          [row.id]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void submitReplace(row.id);
+                      }}
+                      aria-label="Replacement invite URL"
+                    />
+                    <button
+                      type="button"
+                      className={styles.replaceSaveBtn}
+                      disabled={
+                        replaceBusy === row.id ||
+                        !(replaceDraft[row.id] ?? "").trim()
+                      }
+                      onClick={() => void submitReplace(row.id)}
+                    >
+                      {replaceBusy === row.id ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.replaceCancelBtn}
+                      disabled={replaceBusy === row.id}
+                      onClick={() => {
+                        setReplacingId(null);
+                        setReplaceDraft((d) => {
+                          const next = { ...d };
+                          delete next[row.id];
+                          return next;
+                        });
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    className={styles.fetchOneBtn}
-                    disabled={busyOne || loading}
-                    aria-label={`Fetch Discord invite for ${r.name}`}
-                    onClick={() => void fetchLinkForGuild(r.discordGuildId)}
+                    className={styles.replaceToggleBtn}
+                    onClick={() => {
+                      setReplacingId(row.id);
+                      setReplaceDraft((d) => ({
+                        ...d,
+                        [row.id]: d[row.id] ?? "",
+                      }));
+                    }}
                   >
-                    <Link2 size={12} strokeWidth={2} aria-hidden />
-                    {busyOne ? "Fetching…" : "Fetch link"}
+                    Replace link
                   </button>
-                  {diag ? (
-                    <details className={styles.guildLogDetails} open>
-                      <summary>Invite debug log</summary>
-                      {diag.error ? (
-                        <p className={styles.guildLogErr} role="alert">
-                          {diag.error}
-                        </p>
-                      ) : null}
-                      <pre className={styles.guildLogPre}>
-                        {diag.logs.length > 0
-                          ? diag.logs.join("\n")
-                          : "(no log lines)"}
-                      </pre>
-                    </details>
-                  ) : null}
-                </div>
-              </article>
+                )}
+              </li>
             );
           })}
-        </div>
-      ) : loading && servers === null && !loadErr ? (
-        <p className={styles.empty}>Loading servers…</p>
+        </ul>
+      ) : loading ? (
+        <p className={styles.empty}>Loading…</p>
       ) : null}
     </div>
   );
