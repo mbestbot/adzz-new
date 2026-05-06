@@ -61,6 +61,18 @@ function discoveryProgressTitle(p: RebuildProgress): string {
   return `${finished}`;
 }
 
+type GuildFetchLinkResponse = {
+  ok?: boolean;
+  discordGuildId?: string;
+  joinDiscordUrl?: string | null;
+  logs?: string[];
+  error?: string;
+  server?: DiscoveryServer;
+  generatedAt?: number;
+};
+
+type GuildDiag = { logs: string[]; error?: string };
+
 type FetchLinksResponse = {
   ok?: boolean;
   accepted?: boolean;
@@ -75,6 +87,8 @@ const FETCH_LINKS_POST_TIMEOUT_MS = 45_000;
 const FETCH_LINKS_POLL_MS = 3_000;
 const FETCH_LINKS_POLL_MAX_MS = 20 * 60_000;
 const REBUILD_PROGRESS_POLL_MS = 1_000;
+/** Per-guild invite resolution can hit many Discord endpoints (rate limits, etc.). */
+const GUILD_FETCH_LINK_TIMEOUT_MS = 120_000;
 
 function guildIconUrl(guildId: string, icon: string | null): string | null {
   if (!icon) return null;
@@ -109,6 +123,8 @@ export function PromoServersView() {
     null
   );
   const [fetchElapsedSec, setFetchElapsedSec] = useState(0);
+  const [guildBusy, setGuildBusy] = useState<Record<string, boolean>>({});
+  const [guildDiag, setGuildDiag] = useState<Record<string, GuildDiag>>({});
   const progressPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopProgressPoll = useCallback(() => {
@@ -235,6 +251,64 @@ export function PromoServersView() {
       setFetchLinksBusy(false);
     }
   }, [generatedAt, startProgressPoll, stopProgressPoll]);
+
+  const fetchLinkForGuild = useCallback(async (guildId: string) => {
+    setGuildBusy((b) => ({ ...b, [guildId]: true }));
+    try {
+      const res = await apiFetch(
+        "/api/discovery/guild-fetch-link",
+        {
+          method: "POST",
+          body: JSON.stringify({ discordGuildId: guildId }),
+        },
+        { timeoutMs: GUILD_FETCH_LINK_TIMEOUT_MS }
+      );
+      const data = (await res.json().catch(() => ({}))) as GuildFetchLinkResponse;
+      const logs = Array.isArray(data.logs) ? data.logs : [];
+      if (!res.ok) {
+        setGuildDiag((d) => ({
+          ...d,
+          [guildId]: {
+            logs,
+            error: data.error ?? `Request failed (${res.status})`,
+          },
+        }));
+        return;
+      }
+      const softErr =
+        !data.joinDiscordUrl
+          ? "No discord.gg link — check the log (bot token, Create Invite permission, or custom URL limits)."
+          : undefined;
+      setGuildDiag((d) => ({
+        ...d,
+        [guildId]: { logs, error: softErr },
+      }));
+      if (data.server) {
+        setServers((prev) =>
+          prev
+            ? prev.map((s) =>
+                s.discordGuildId === guildId ? { ...s, ...data.server } : s
+              )
+            : null
+        );
+      }
+      if (data.generatedAt != null && Number.isFinite(data.generatedAt)) {
+        setGeneratedAt(data.generatedAt);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Fetch failed";
+      setGuildDiag((d) => ({
+        ...d,
+        [guildId]: { logs: [], error: msg },
+      }));
+    } finally {
+      setGuildBusy((b) => {
+        const next = { ...b };
+        delete next[guildId];
+        return next;
+      });
+    }
+  }, []);
 
   useEffect(() => {
     if (!fetchLinksBusy || fetchProgress?.startedAt == null) {
@@ -440,6 +514,8 @@ export function PromoServersView() {
         <div className={styles.grid}>
           {filtered.map((r) => {
             const iconSrc = guildIconUrl(r.discordGuildId, r.icon);
+            const busyOne = Boolean(guildBusy[r.discordGuildId]);
+            const diag = guildDiag[r.discordGuildId];
             return (
               <article key={r.discordGuildId} className={styles.card}>
                 <div className={styles.iconWrap}>
@@ -464,24 +540,51 @@ export function PromoServersView() {
                 <p className={styles.meta}>
                   {r.approximateMemberCount.toLocaleString()} members
                 </p>
-                {r.joinDiscordUrl ? (
-                  <a
-                    className={styles.openLink}
-                    href={r.joinDiscordUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                <div className={styles.cardFooter}>
+                  {r.joinDiscordUrl ? (
+                    <a
+                      className={styles.openLink}
+                      href={r.joinDiscordUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Join server
+                      <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
+                    </a>
+                  ) : (
+                    <span
+                      className={styles.joinUnavailable}
+                      title="No invite link yet — the posting bot needs Manage Server or Create Invite on this guild."
+                    >
+                      Invite unavailable
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.fetchOneBtn}
+                    disabled={busyOne || loading}
+                    aria-label={`Fetch Discord invite for ${r.name}`}
+                    onClick={() => void fetchLinkForGuild(r.discordGuildId)}
                   >
-                    Join server
-                    <ExternalLink size={12} strokeWidth={2.25} aria-hidden />
-                  </a>
-                ) : (
-                  <span
-                    className={styles.joinUnavailable}
-                    title="No invite link yet — the posting bot needs Manage Server or Create Invite on this guild."
-                  >
-                    Invite unavailable
-                  </span>
-                )}
+                    <Link2 size={12} strokeWidth={2} aria-hidden />
+                    {busyOne ? "Fetching…" : "Fetch link"}
+                  </button>
+                  {diag ? (
+                    <details className={styles.guildLogDetails} open>
+                      <summary>Invite debug log</summary>
+                      {diag.error ? (
+                        <p className={styles.guildLogErr} role="alert">
+                          {diag.error}
+                        </p>
+                      ) : null}
+                      <pre className={styles.guildLogPre}>
+                        {diag.logs.length > 0
+                          ? diag.logs.join("\n")
+                          : "(no log lines)"}
+                      </pre>
+                    </details>
+                  ) : null}
+                </div>
               </article>
             );
           })}
