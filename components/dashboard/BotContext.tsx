@@ -258,7 +258,7 @@ export function BotProvider({ children }: { children: ReactNode }) {
         ok: false as const,
         error:
           data.error ??
-          `Sync failed (HTTP ${res.status}). A 502 from the host usually means nginx timed out or could not reach the API — check proxy_read_timeout for /adzz-api/ and that Node is listening on port 5020.`,
+          `Sync failed (HTTP ${res.status}). A 502 from the host usually means nginx timed out or could not reach the API — check proxy_read_timeout for /adzz-api/ and that Node matches nginx upstream (see deploy/nginx-myadbot-full.conf).`,
       };
     } finally {
       setSyncing(false);
