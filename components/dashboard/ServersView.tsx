@@ -1542,24 +1542,9 @@ export function ServersView() {
     const kickTotal = countNonPausedListed(preSnap);
     setSchedulerKickProgress({ phase: "tracking", done: 0, total: kickTotal });
 
-    const pollMs = 400;
-    const pollTimer = window.setInterval(() => {
-      void (async () => {
-        const snap = await fetchAdCampaign({
-          timeoutMs: KICK_POLL_TIMEOUT_MS,
-        });
-        if (!snap) return;
-        const done = countKickCompletedSinceSnapshot(
-          snap,
-          kickActivityBeforeRef.current
-        );
-        setSchedulerKickProgress({
-          phase: "tracking",
-          done,
-          total: kickTotal,
-        });
-      })();
-    }, pollMs);
+    /** After POST returns, the scheduler still runs in the background — poll until counts catch up or we hit this cap. */
+    const KICK_POLL_MAX_MS = 15 * 60 * 1000;
+    const KICK_POLL_INTERVAL_MS = 400;
 
     try {
       const schedRes = await apiFetch(
@@ -1629,8 +1614,31 @@ export function ServersView() {
       await fetchAdCampaign();
       window.setTimeout(() => void fetchAdCampaign(), 2500);
       window.setTimeout(() => void fetchAdCampaign(), 6000);
+
+      if (kickTotal > 0) {
+        const deadline = Date.now() + KICK_POLL_MAX_MS;
+        while (Date.now() < deadline) {
+          const snap = await fetchAdCampaign({
+            timeoutMs: KICK_POLL_TIMEOUT_MS,
+          });
+          if (snap) {
+            const done = countKickCompletedSinceSnapshot(
+              snap,
+              kickActivityBeforeRef.current
+            );
+            setSchedulerKickProgress({
+              phase: "tracking",
+              done,
+              total: kickTotal,
+            });
+            if (done >= kickTotal) break;
+          }
+          await new Promise((r) =>
+            window.setTimeout(r, KICK_POLL_INTERVAL_MS)
+          );
+        }
+      }
     } finally {
-      window.clearInterval(pollTimer);
       const finalSnap = await fetchAdCampaign({
         timeoutMs: KICK_POLL_TIMEOUT_MS,
       });
