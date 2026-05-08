@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  Timer,
   Wrench,
   Wand2,
 } from "lucide-react";
@@ -527,6 +528,9 @@ export function ServersView() {
     setDiscordStatus({ phase: "loading" });
   }, [activeBotId]);
   const [checkingChannelId, setCheckingChannelId] = useState<string | null>(
+    null
+  );
+  const [slowmodeChannelId, setSlowmodeChannelId] = useState<string | null>(
     null
   );
   const [schedulerKickBusy, setSchedulerKickBusy] = useState(false);
@@ -1513,6 +1517,40 @@ export function ServersView() {
           checkAbortByChannelRef.current.delete(channelId);
         }
         setCheckingChannelId(null);
+      }
+    },
+    [activeBotId, fetchAdCampaign]
+  );
+
+  const setChannelSlowmode5 = useCallback(
+    async (channelId: string) => {
+      if (!activeBotId) return;
+      setSlowmodeChannelId(channelId);
+      try {
+        const res = await apiFetch("/api/ad-campaign/set-channel-slowmode", {
+          method: "POST",
+          body: JSON.stringify({
+            botId: activeBotId,
+            channelId,
+            seconds: 5,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          slowmodeSeconds?: number;
+          error?: string;
+        };
+        if (!res.ok) {
+          window.alert(
+            data.error ?? `Could not set slowmode (${res.status})`
+          );
+          return;
+        }
+        await fetchAdCampaign();
+        await apiFetch("/api/ad-campaign/run-scheduler", { method: "POST" });
+        await fetchAdCampaign();
+      } finally {
+        setSlowmodeChannelId(null);
       }
     },
     [activeBotId, fetchAdCampaign]
@@ -2533,11 +2571,22 @@ export function ServersView() {
                           >
                             {ch.interval}
                           </td>
-                          <td
-                            className={styles.cellMuted}
-                            title={ch.slowDownTitle}
-                          >
-                            {ch.slowDown}
+                          <td className={styles.cellMuted}>
+                            <div className={styles.slowDownCell}>
+                              <span title={ch.slowDownTitle}>{ch.slowDown}</span>
+                              {adCampaign.listedChannelIds.has(ch.id) ? (
+                                <button
+                                  type="button"
+                                  className={styles.slowmode5Btn}
+                                  disabled={slowmodeChannelId === ch.id}
+                                  title="Set Discord user slowmode to 5s (needs Manage Channel), update this app, and run the scheduler"
+                                  onClick={() => void setChannelSlowmode5(ch.id)}
+                                >
+                                  <Timer size={14} strokeWidth={2.5} aria-hidden />
+                                  5s
+                                </button>
+                              ) : null}
+                            </div>
                           </td>
                           <td
                             className={styles.cellMuted}
@@ -2553,22 +2602,49 @@ export function ServersView() {
                           </td>
                           <td className={styles.cellMuted}>{ch.messagesSent}</td>
                           <td className={styles.actionsCell}>
-                            <ChannelActionsMenu
-                              channelName={ch.name}
-                              pauseSupported={adCampaign.listedChannelIds.has(
-                                ch.id
-                              )}
-                              channelPaused={ch.status === "paused"}
-                              onPauseResume={() =>
-                                void toggleChannelPause(
-                                  ch.id,
-                                  ch.status === "paused"
-                                )
-                              }
-                              onRemove={() =>
-                                removeLinkedChannel(server.id, ch.id)
-                              }
-                            />
+                            <div className={styles.actionsCellRow}>
+                              <button
+                                type="button"
+                                className={styles.sendChannelBtn}
+                                disabled={
+                                  checkingChannelId === ch.id ||
+                                  !adCampaign.listedChannelIds.has(ch.id)
+                                }
+                                title={
+                                  !adCampaign.listedChannelIds.has(ch.id)
+                                    ? "Sync targets from the Messages page first"
+                                    : "Send this channel’s campaign message now (respects Discord slowmode)"
+                                }
+                                aria-label={
+                                  checkingChannelId === ch.id
+                                    ? "Sending…"
+                                    : "Send ad now"
+                                }
+                                onClick={() => void checkPostChannel(ch.id)}
+                              >
+                                <Send
+                                  size={17}
+                                  strokeWidth={2.25}
+                                  aria-hidden
+                                />
+                              </button>
+                              <ChannelActionsMenu
+                                channelName={ch.name}
+                                pauseSupported={adCampaign.listedChannelIds.has(
+                                  ch.id
+                                )}
+                                channelPaused={ch.status === "paused"}
+                                onPauseResume={() =>
+                                  void toggleChannelPause(
+                                    ch.id,
+                                    ch.status === "paused"
+                                  )
+                                }
+                                onRemove={() =>
+                                  removeLinkedChannel(server.id, ch.id)
+                                }
+                              />
+                            </div>
                           </td>
                         </tr>
                       ))}
