@@ -45,6 +45,11 @@ function startGuildListPolling(
 /** Minimal slice of GET /api/messages-state for Servers channel badges. */
 type MessagesStateForServers = {
   uiMode?: string;
+  burst?: {
+    quotaSent?: number;
+    quotaTotal?: number;
+    message?: string;
+  } | null;
   adPool?: {
     messages?: string[];
     intervalMs?: number;
@@ -1358,18 +1363,58 @@ export function ServersView() {
     if (!activeBotId) return;
     setSchedulerKickBusy(true);
     try {
-      const res = await apiFetch("/api/ad-campaign/run-scheduler", {
-        method: "POST",
-      });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) {
-        window.alert(data.error ?? `Could not run scheduler (${res.status})`);
+      const [schedRes, msgRes] = await Promise.all([
+        apiFetch("/api/ad-campaign/run-scheduler", {
+          method: "POST",
+        }),
+        apiFetch("/api/messages-state"),
+      ]);
+      const data = (await schedRes.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!schedRes.ok) {
+        window.alert(data.error ?? `Could not run scheduler (${schedRes.status})`);
         return;
       }
+
+      const warnings: string[] = [];
+      if (msgRes.ok) {
+        const ms = (await msgRes.json()) as MessagesStateForServers;
+        const burst = ms.burst;
+        const qs =
+          burst?.quotaSent != null ? Math.max(0, Number(burst.quotaSent)) : 0;
+        const qt =
+          burst?.quotaTotal != null ? Math.max(1, Number(burst.quotaTotal)) : 1;
+        const burstMsg =
+          burst?.message != null && String(burst.message).trim().length > 0;
+        if (burst && burstMsg && qs < qt) {
+          warnings.push(
+            "Burst campaign is still running — Basic campaigns wait until burst finishes or you stop it on Messages."
+          );
+        }
+        if (ms.uiMode === "adpool") {
+          const pool = ms.adPool;
+          const poolMsgs =
+            Array.isArray(pool?.messages) &&
+            pool.messages.some((m) => String(m ?? "").trim().length > 0);
+          const poolTg = (pool?.targets?.length ?? 0) > 0;
+          if (poolMsgs && poolTg) {
+            warnings.push(
+              'Messages is on "Ad pool" — Basic campaigns do not run. Switch the Messages tab to Basic or clear the pool.'
+            );
+          }
+        }
+      }
+
+      const base =
+        "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
       setToolbarFlash(
-        "Scheduler triggered — ads should start within a few seconds if your campaign is ready."
+        warnings.length ? `${warnings.join(" ")} ${base}` : base
       );
-      window.setTimeout(() => setToolbarFlash(null), 6000);
+      window.setTimeout(
+        () => setToolbarFlash(null),
+        warnings.length ? 14_000 : 6000
+      );
       await fetchAdCampaign();
       window.setTimeout(() => void fetchAdCampaign(), 2500);
       window.setTimeout(() => void fetchAdCampaign(), 6000);
