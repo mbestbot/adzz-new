@@ -2029,9 +2029,10 @@ export function ServersView() {
                 />
               </div>
               <p className={styles.schedulerKickHint}>
-                Updates when each channel logs a send or error. If this stays
-                at 0, check the amber hint above (Ad pool / burst) or Discord
-                permissions.
+                Updates when each channel logs a send or error. Stuck at 0? Open{" "}
+                <strong>Messages</strong>: stop or finish <strong>Burst</strong>,
+                or switch from <strong>Ad pool</strong> to Basic if you expect
+                standard campaign posts. Also confirm the bot can send in Discord.
               </p>
             </>
           ) : (
