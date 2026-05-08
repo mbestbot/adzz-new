@@ -454,6 +454,10 @@ export function ServersView() {
     null
   );
   const [schedulerKickBusy, setSchedulerKickBusy] = useState(false);
+  /** Why Basic campaigns might not run (burst / Ad pool mode) — mirrors backend userSkipsStandardCampaigns. */
+  const [messagesRoutingHint, setMessagesRoutingHint] = useState<string | null>(
+    null
+  );
   const checkAbortByChannelRef = useRef<Map<string, AbortController>>(
     new Map()
   );
@@ -521,6 +525,7 @@ export function ServersView() {
         channelAdsSent: {},
       });
       slowmodeProbeAttemptedRef.current = new Set();
+      setMessagesRoutingHint(null);
       return;
     }
     const [res, msgRes] = await Promise.all([
@@ -531,6 +536,7 @@ export function ServersView() {
       if (process.env.NODE_ENV === "development") {
         console.warn("[ServersView] /api/ad-campaign failed", res.status);
       }
+      setMessagesRoutingHint(null);
       return;
     }
     let msgState: MessagesStateForServers | null = null;
@@ -710,6 +716,36 @@ export function ServersView() {
       guildAdsSent[gid] =
         (guildAdsSent[gid] ?? 0) + (channelAdsSent[chId] ?? 0);
     }
+
+    let routingHint: string | null = null;
+    if (msgState) {
+      const hints: string[] = [];
+      const burst = msgState.burst;
+      const qs =
+        burst?.quotaSent != null ? Math.max(0, Number(burst.quotaSent)) : 0;
+      const qt =
+        burst?.quotaTotal != null ? Math.max(1, Number(burst.quotaTotal)) : 1;
+      const burstMsg =
+        burst?.message != null && String(burst.message).trim().length > 0;
+      if (burst && burstMsg && qs < qt) {
+        hints.push(
+          "Burst campaign is running — basic campaigns wait until it finishes or you stop it on Messages."
+        );
+      }
+      const pool = msgState.adPool;
+      const poolMsgs =
+        Array.isArray(pool?.messages) &&
+        pool.messages.some((m) => String(m ?? "").trim().length > 0);
+      const poolTg = (pool?.targets?.length ?? 0) > 0;
+      if (msgState.uiMode === "adpool" && poolMsgs && poolTg) {
+        hints.push(
+          'Messages is on "Ad pool" — only pool copy is sent; Basic campaign copy is skipped. Switch Messages to Basic or clear the pool.'
+        );
+      }
+      routingHint = hints.length ? hints.join(" ") : null;
+    }
+    setMessagesRoutingHint(routingHint);
+
     setAdCampaign({
       enabled: anyEnabled,
       runningChannelIds: running,
@@ -1050,12 +1086,43 @@ export function ServersView() {
             adCampaign.intervalSeconds;
           const discordSlow =
             adCampaign.channelDiscordSlowmodeSec[c.id] ?? null;
+          const sentOk = adCampaign.channelLastSentAt[c.id];
+          const errAt = adCampaign.channelLastSendErrorAt[c.id];
+          let activityTs: number | null = null;
+          if (
+            sentOk != null &&
+            Number.isFinite(sentOk) &&
+            errAt != null &&
+            Number.isFinite(errAt)
+          ) {
+            activityTs = Math.max(sentOk, errAt);
+          } else if (sentOk != null && Number.isFinite(sentOk)) {
+            activityTs = sentOk;
+          } else if (errAt != null && Number.isFinite(errAt)) {
+            activityTs = errAt;
+          }
+          const neverSent =
+            isInCampaign &&
+            (sentOk == null || !Number.isFinite(Number(sentOk)));
+          const noRunYet =
+            activityTs == null || !Number.isFinite(Number(activityTs));
+
           let interval = "—";
           let intervalTitle: string | undefined;
           if (isInCampaign && intSec != null) {
-            interval = formatCooldownSeconds(intSec);
-            intervalTitle =
-              "Campaign interval from Messages. Sends also respect Discord user slowmode (Slow down column).";
+            if (neverSent && noRunYet) {
+              interval = "Now";
+              intervalTitle =
+                "First attempt runs on the next scheduler tick or when you press Send ads now. After an attempt, retries wait at least 30 minutes until a successful send (plus Discord slowmode).";
+            } else if (neverSent && !noRunYet) {
+              interval = formatCooldownSeconds(30 * 60);
+              intervalTitle =
+                "Until the first successful send, retries run at most every 30 minutes (plus Discord slowmode). Your Messages interval applies after the first success.";
+            } else {
+              interval = formatCooldownSeconds(intSec);
+              intervalTitle =
+                "Campaign interval from Messages. Sends also respect Discord user slowmode (Slow down column).";
+            }
           }
           let slowDown = "—";
           let slowDownTitle: string | undefined;
@@ -1073,33 +1140,24 @@ export function ServersView() {
                 "Discord user slowmode for this channel (from Discord).";
             }
           }
-          const sentOk = adCampaign.channelLastSentAt[c.id];
-          const errAt = adCampaign.channelLastSendErrorAt[c.id];
-          let activityTs: number | null = null;
-          if (
-            sentOk != null &&
-            Number.isFinite(sentOk) &&
-            errAt != null &&
-            Number.isFinite(errAt)
-          ) {
-            activityTs = Math.max(sentOk, errAt);
-          } else if (sentOk != null && Number.isFinite(sentOk)) {
-            activityTs = sentOk;
-          } else if (errAt != null && Number.isFinite(errAt)) {
-            activityTs = errAt;
-          }
           const lastSent =
             sentOk != null && Number.isFinite(sentOk)
               ? formatRelativeLastRun(sentOk, wallNow)
-              : "—";
+              : isInCampaign
+                ? "Not yet"
+                : "—";
           const lastSentTitle =
             sentOk != null && Number.isFinite(sentOk)
               ? `Last successful send: ${formatLastRunAt(sentOk)}`
-              : "No successful post recorded yet for this channel in this app.";
+              : isInCampaign
+                ? "No successful delivery yet — Pending first attempt or retries."
+                : "No successful post recorded yet for this channel in this app.";
           const lastRun =
             activityTs != null && Number.isFinite(activityTs)
               ? formatRelativeLastRun(activityTs, wallNow)
-              : "—";
+              : isInCampaign
+                ? "Pending"
+                : "—";
           const lastRunTitle =
             activityTs != null && Number.isFinite(activityTs)
               ? errAt != null &&
@@ -1112,7 +1170,9 @@ export function ServersView() {
                   : errAt != null
                     ? `Last attempt: ${formatLastRunAt(errAt)}`
                     : formatLastRunAt(activityTs)
-              : undefined;
+              : isInCampaign
+                ? "No scheduler attempt recorded yet — wait a few seconds or press Send ads now."
+                : undefined;
           const messagesSent = isInCampaign
             ? (adCampaign.channelAdsSent[c.id] ?? 0).toLocaleString()
             : "—";
@@ -1363,20 +1423,23 @@ export function ServersView() {
     if (!activeBotId) return;
     setSchedulerKickBusy(true);
     try {
-      const [schedRes, msgRes] = await Promise.all([
-        apiFetch("/api/ad-campaign/run-scheduler", {
+      const schedRes = await apiFetch(
+        "/api/ad-campaign/run-scheduler",
+        {
           method: "POST",
-        }),
-        apiFetch("/api/messages-state"),
-      ]);
+        },
+        { timeoutMs: 180_000 }
+      );
       const data = (await schedRes.json().catch(() => ({}))) as {
         error?: string;
+        immediate?: boolean;
       };
       if (!schedRes.ok) {
         window.alert(data.error ?? `Could not run scheduler (${schedRes.status})`);
         return;
       }
 
+      const msgRes = await apiFetch("/api/messages-state");
       const warnings: string[] = [];
       if (msgRes.ok) {
         const ms = (await msgRes.json()) as MessagesStateForServers;
@@ -1407,13 +1470,15 @@ export function ServersView() {
       }
 
       const base =
-        "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
+        data.immediate === true
+          ? "Immediate send pass finished — check Discord channels or Logs if nothing appeared (permissions / slowmode)."
+          : "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
       setToolbarFlash(
         warnings.length ? `${warnings.join(" ")} ${base}` : base
       );
       window.setTimeout(
         () => setToolbarFlash(null),
-        warnings.length ? 14_000 : 6000
+        warnings.length ? 14_000 : 8000
       );
       await fetchAdCampaign();
       window.setTimeout(() => void fetchAdCampaign(), 2500);
@@ -1708,9 +1773,25 @@ export function ServersView() {
 
       <p className={styles.pageLead}>
         Newly linked channels are queued for a post within a few seconds (then your
-        interval applies). Make sure your ad copy is saved on{" "}
-        <strong>Messages</strong>.
+        interval applies). Save ad copy and targets on{" "}
+        <strong>Messages</strong>. If Discord shows no sends, open each server’s
+        channel settings and allow the bot to <strong>View Channel</strong> and{" "}
+        <strong>Send Messages</strong> (category overrides count).
       </p>
+
+      {messagesRoutingHint ? (
+        <p
+          style={{
+            color: "var(--dash-amber, #f59e0b)",
+            marginBottom: "0.85rem",
+            maxWidth: "52rem",
+            lineHeight: 1.45,
+          }}
+          role="status"
+        >
+          {messagesRoutingHint}
+        </p>
+      ) : null}
 
       {loadError ? (
         <p style={{ color: "var(--dash-amber)", marginBottom: "1rem" }}>
@@ -1877,10 +1958,10 @@ export function ServersView() {
             disabled={
               syncing || fullReloading || !activeBotId || schedulerKickBusy
             }
-            title="Runs the ad scheduler immediately instead of waiting for the next automatic tick (~5s). Use if posting hasn’t started yet."
+            title="Runs posting now for your account (waits until finished): skips campaign cooldown but still obeys Discord channel slowmode and per-bot spacing."
           >
             <Send size={16} strokeWidth={2} aria-hidden />
-            {schedulerKickBusy ? "Starting…" : "Send ads now"}
+            {schedulerKickBusy ? "Sending…" : "Send ads now"}
           </button>
           <button
             type="button"

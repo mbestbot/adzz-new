@@ -20,8 +20,11 @@ import {
 } from "@/components/dashboard/BotContext";
 import styles from "./messages.module.css";
 
+/** Matches backend MIN_CAMPAIGN_INTERVAL_MS (10 min floor). */
+const DEFAULT_INTERVAL = "10 Minute(s)";
+
 const INTERVAL_OPTIONS = [
-  "5 Minute(s)",
+  "10 Minute(s)",
   "30 Minute(s)",
   "1 Hour(s)",
   "2 Hour(s)",
@@ -29,6 +32,14 @@ const INTERVAL_OPTIONS = [
   "12 Hour(s)",
   "24 Hour(s)",
 ];
+
+function normalizeIntervalLabel(label: string | null | undefined): string {
+  const k = String(label ?? "").trim();
+  if (INTERVAL_OPTIONS.includes(k)) return k;
+  /** Legacy / below-min options → server clamps to 10 min */
+  if (k === "5 Minute(s)") return DEFAULT_INTERVAL;
+  return DEFAULT_INTERVAL;
+}
 
 type ApiTarget = {
   botId: string;
@@ -108,7 +119,7 @@ function hydrateCampaignFromApi(
 ): LocalCampaign {
   const targets = api.targets ?? [];
   if (targets.length === 0) {
-    const label = api.intervalLabel ?? "1 Hour(s)";
+    const label = normalizeIntervalLabel(api.intervalLabel);
     return {
       id: api.id,
       title: (api.title ?? "").trim() || "Campaign",
@@ -120,7 +131,7 @@ function hydrateCampaignFromApi(
       selectedBotIds: [],
       allServersSelected: false,
       selectedServerIds: [],
-      interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
+      interval: label,
       sendPeriod: Boolean(api.sendPeriod),
       inactivityTimeout: false,
       serversCollapsed: true,
@@ -145,7 +156,7 @@ function hydrateCampaignFromApi(
       .filter(Boolean)
   );
   const allServersSelected = api.allServersSelected === true;
-  const label = api.intervalLabel ?? "1 Hour(s)";
+  const label = normalizeIntervalLabel(api.intervalLabel);
   return {
     id: api.id,
     title: (api.title ?? "").trim() || "Campaign",
@@ -157,7 +168,7 @@ function hydrateCampaignFromApi(
     selectedBotIds: allBotsSelected ? [] : [...botIdSet],
     allServersSelected,
     selectedServerIds: allServersSelected ? [] : [...guildIdSet],
-    interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
+    interval: label,
     sendPeriod: Boolean(api.sendPeriod),
     inactivityTimeout: false,
     serversCollapsed: true,
@@ -171,7 +182,7 @@ function hydrateAdPoolFromApi(
   bots: BotSummary[]
 ): AdPoolLocal {
   const targets = api.targets ?? [];
-  const label = api.intervalLabel ?? "1 Hour(s)";
+  const label = normalizeIntervalLabel(api.intervalLabel);
   const messages =
     Array.isArray(api.messages) && api.messages.length > 0
       ? api.messages.map((m) => String(m ?? ""))
@@ -183,7 +194,7 @@ function hydrateAdPoolFromApi(
       selectedBotIds: [],
       allServersSelected: false,
       selectedServerIds: [],
-      interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
+      interval: label,
       serversCollapsed: true,
     };
   }
@@ -210,7 +221,7 @@ function hydrateAdPoolFromApi(
     selectedBotIds: allBotsSelected ? [] : [...botIdSet],
     allServersSelected,
     selectedServerIds: allServersSelected ? [] : [...guildIdSet],
-    interval: INTERVAL_OPTIONS.includes(label) ? label : "1 Hour(s)",
+    interval: label,
     serversCollapsed: true,
   };
 }
@@ -502,7 +513,7 @@ export function MessagesView() {
   const [burstBotId, setBurstBotId] = useState("");
   const [burstMessage, setBurstMessage] = useState("");
   const [burstQuota, setBurstQuota] = useState(10);
-  const [burstInterval, setBurstInterval] = useState("1 Hour(s)");
+  const [burstInterval, setBurstInterval] = useState(DEFAULT_INTERVAL);
   const [burstBusy, setBurstBusy] = useState(false);
 
   const [subscriptionTier, setSubscriptionTier] = useState<
@@ -515,7 +526,7 @@ export function MessagesView() {
     selectedBotIds: [],
     allServersSelected: false,
     selectedServerIds: [],
-    interval: "1 Hour(s)",
+    interval: DEFAULT_INTERVAL,
     serversCollapsed: true,
   }));
   const adPoolHydratedRef = useRef(false);
@@ -848,7 +859,7 @@ export function MessagesView() {
               selectedBotIds: [],
               allServersSelected: false,
               selectedServerIds: [],
-              interval: "1 Hour(s)",
+              interval: DEFAULT_INTERVAL,
               sendPeriod: true,
               inactivityTimeout: false,
             }
@@ -1391,7 +1402,7 @@ export function MessagesView() {
                           >
                             <strong>{adTargetCount}</strong> channel
                             {adTargetCount !== 1 ? "s" : ""} targeted · first
-                            send within ~25s after you save (scheduler tick)
+                            send within seconds after you save
                           </p>
                           {c.lastSendError ? (
                             <p className={styles.campaignError} role="alert">
