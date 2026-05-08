@@ -471,6 +471,11 @@ type BotDiscordStatus =
   | { phase: "ready"; active: boolean; error?: string }
   | { phase: "failed"; message: string };
 
+/** Send ads now: show UI immediately, then per-channel counts. */
+type SchedulerKickUi =
+  | { phase: "starting" }
+  | { phase: "tracking"; done: number; total: number };
+
 export function ServersView() {
   const {
     activeBotId,
@@ -483,6 +488,9 @@ export function ServersView() {
     refreshServerUiLinks,
     saveServerUiLinks,
   } = useBots();
+  const activeBotIdRef = useRef(activeBotId);
+  activeBotIdRef.current = activeBotId;
+
   const [metricId, setMetricId] = useState<MetricId>("servers");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
@@ -509,14 +517,21 @@ export function ServersView() {
   const [discordStatus, setDiscordStatus] = useState<BotDiscordStatus>({
     phase: "loading",
   });
+  const discordStatusPollInFlightRef = useRef(false);
+  const fetchDiscordStatusLatestRef = useRef<
+    (() => Promise<void>) | undefined
+  >(undefined);
+
+  useEffect(() => {
+    discordStatusPollInFlightRef.current = false;
+    setDiscordStatus({ phase: "loading" });
+  }, [activeBotId]);
   const [checkingChannelId, setCheckingChannelId] = useState<string | null>(
     null
   );
   const [schedulerKickBusy, setSchedulerKickBusy] = useState(false);
-  const [schedulerKickProgress, setSchedulerKickProgress] = useState<{
-    done: number;
-    total: number;
-  } | null>(null);
+  const [schedulerKickProgress, setSchedulerKickProgress] =
+    useState<SchedulerKickUi | null>(null);
   const kickActivityBeforeRef = useRef<Record<string, number>>({});
   /** Why Basic campaigns might not run (burst / Ad pool mode) — mirrors backend userSkipsStandardCampaigns. */
   const [messagesRoutingHint, setMessagesRoutingHint] = useState<string | null>(
@@ -559,7 +574,10 @@ export function ServersView() {
     linkedByGuildRef.current = linkedByGuild;
   }, [linkedByGuild]);
 
-  const fetchAdCampaign = useCallback(async (): Promise<AdCampaignSnapshot | null> => {
+  const fetchAdCampaign = useCallback(
+    async (fetchOpts?: {
+      timeoutMs?: number;
+    }): Promise<AdCampaignSnapshot | null> => {
     if (!activeBotId) {
       setAdCampaign({
         enabled: false,
@@ -579,9 +597,13 @@ export function ServersView() {
       setMessagesRoutingHint(null);
       return null;
     }
+    const apiOpts =
+      fetchOpts?.timeoutMs != null && fetchOpts.timeoutMs > 0
+        ? { timeoutMs: fetchOpts.timeoutMs }
+        : undefined;
     const [res, msgRes] = await Promise.all([
-      apiFetch("/api/ad-campaign"),
-      apiFetch("/api/messages-state"),
+      apiFetch("/api/ad-campaign", {}, apiOpts),
+      apiFetch("/api/messages-state", {}, apiOpts),
     ]);
     if (!res.ok) {
       if (process.env.NODE_ENV === "development") {
@@ -813,7 +835,9 @@ export function ServersView() {
     };
     setAdCampaign(next);
     return next;
-  }, [activeBotId]);
+    },
+    [activeBotId]
+  );
 
   const loadGuilds = useCallback(async () => {
     if (!activeBotId) {
@@ -842,14 +866,31 @@ export function ServersView() {
   }, [activeBotId, bots]);
 
   const fetchDiscordConnectionStatus = useCallback(async () => {
-    if (!activeBotId) return;
+    const botId = activeBotId;
+    if (!botId) return;
+    if (discordStatusPollInFlightRef.current) return;
+    discordStatusPollInFlightRef.current = true;
     setDiscordStatus({ phase: "loading" });
     try {
-      const res = await apiFetch(`/api/bots/${activeBotId}/status`);
+      const res = await apiFetch(`/api/bots/${botId}/status`);
+      if (botId !== activeBotIdRef.current) return;
       const data = (await res.json()) as {
         active?: boolean;
         error?: string;
+        retryAfterMs?: number;
       };
+      if (botId !== activeBotIdRef.current) return;
+      if (res.status === 429) {
+        const wait = Math.min(
+          Math.max(Number(data.retryAfterMs) || 3000, 500),
+          120_000
+        );
+        window.setTimeout(() => {
+          if (botId !== activeBotIdRef.current) return;
+          void fetchDiscordStatusLatestRef.current?.();
+        }, wait);
+        return;
+      }
       if (!res.ok) {
         const msg =
           typeof data === "object" && data && "error" in data && data.error
@@ -864,12 +905,17 @@ export function ServersView() {
         error: data.error,
       });
     } catch (e) {
+      if (botId !== activeBotIdRef.current) return;
       setDiscordStatus({
         phase: "failed",
         message: e instanceof Error ? e.message : "Could not reach API",
       });
+    } finally {
+      discordStatusPollInFlightRef.current = false;
     }
   }, [activeBotId]);
+
+  fetchDiscordStatusLatestRef.current = fetchDiscordConnectionStatus;
 
   useEffect(() => {
     if (!activeBotId) return;
@@ -1038,7 +1084,7 @@ export function ServersView() {
       )
         return;
       void fetchDiscordConnectionStatus();
-    }, 20000);
+    }, 25000);
     return () => window.clearInterval(id);
   }, [activeBotId, fetchDiscordConnectionStatus]);
 
@@ -1473,29 +1519,42 @@ export function ServersView() {
   );
 
   const kickAdScheduler = useCallback(async () => {
+    const KICK_SNAPSHOT_TIMEOUT_MS = 5000;
+    const KICK_POLL_TIMEOUT_MS = 8000;
+
     if (!activeBotId) return;
     setSchedulerKickBusy(true);
-    const preSnap = await fetchAdCampaign();
+    setSchedulerKickProgress({ phase: "starting" });
+
+    const preSnap = await fetchAdCampaign({
+      timeoutMs: KICK_SNAPSHOT_TIMEOUT_MS,
+    });
     if (!preSnap) {
       setSchedulerKickBusy(false);
-      window.alert("Could not load campaign state. Try refreshing the page.");
+      setSchedulerKickProgress(null);
+      window.alert(
+        "Could not load campaign state within a few seconds. Check the API or your connection, then try again."
+      );
       return;
     }
 
     kickActivityBeforeRef.current = snapshotChannelActivityMax(preSnap);
     const kickTotal = countNonPausedListed(preSnap);
-    setSchedulerKickProgress({ done: 0, total: kickTotal });
+    setSchedulerKickProgress({ phase: "tracking", done: 0, total: kickTotal });
 
     const pollMs = 400;
     const pollTimer = window.setInterval(() => {
       void (async () => {
-        const snap = await fetchAdCampaign();
+        const snap = await fetchAdCampaign({
+          timeoutMs: KICK_POLL_TIMEOUT_MS,
+        });
         if (!snap) return;
         const done = countKickCompletedSinceSnapshot(
           snap,
           kickActivityBeforeRef.current
         );
         setSchedulerKickProgress({
+          phase: "tracking",
           done,
           total: kickTotal,
         });
@@ -1508,18 +1567,23 @@ export function ServersView() {
         {
           method: "POST",
         },
-        { timeoutMs: 180_000 }
+        { timeoutMs: 30_000 }
       );
       const data = (await schedRes.json().catch(() => ({}))) as {
         error?: string;
         immediate?: boolean;
+        queued?: boolean;
       };
       if (!schedRes.ok) {
         window.alert(data.error ?? `Could not run scheduler (${schedRes.status})`);
         return;
       }
 
-      const msgRes = await apiFetch("/api/messages-state");
+      const msgRes = await apiFetch(
+        "/api/messages-state",
+        {},
+        { timeoutMs: 8000 }
+      );
       const warnings: string[] = [];
       if (msgRes.ok) {
         const ms = (await msgRes.json()) as MessagesStateForServers;
@@ -1550,9 +1614,11 @@ export function ServersView() {
       }
 
       const base =
-        data.immediate === true
-          ? "Immediate send pass finished — check Discord channels or Logs if counts stayed below total (burst pool mode, permissions, or slowmode)."
-          : "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
+        data.queued === true
+          ? "Scheduler started on the server — watch Sending progress below. Large passes can take several minutes (slowmode / many channels)."
+          : data.immediate === true
+            ? "Immediate send pass finished — check Discord channels or Logs if counts stayed below total (burst pool mode, permissions, or slowmode)."
+            : "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
       setToolbarFlash(
         warnings.length ? `${warnings.join(" ")} ${base}` : base
       );
@@ -1565,13 +1631,16 @@ export function ServersView() {
       window.setTimeout(() => void fetchAdCampaign(), 6000);
     } finally {
       window.clearInterval(pollTimer);
-      const finalSnap = await fetchAdCampaign();
+      const finalSnap = await fetchAdCampaign({
+        timeoutMs: KICK_POLL_TIMEOUT_MS,
+      });
       if (finalSnap) {
         const done = countKickCompletedSinceSnapshot(
           finalSnap,
           kickActivityBeforeRef.current
         );
         setSchedulerKickProgress({
+          phase: "tracking",
           done,
           total: kickTotal,
         });
@@ -1910,7 +1979,21 @@ export function ServersView() {
           role="status"
           aria-live="polite"
         >
-          {schedulerKickProgress.total > 0 ? (
+          {schedulerKickProgress.phase === "starting" ? (
+            <>
+              <div className={styles.schedulerKickLabel}>Connecting…</div>
+              <div
+                className={styles.syncFetchTrackIndeterminate}
+                role="progressbar"
+                aria-busy
+                aria-valuetext="Connecting to API"
+              />
+              <p className={styles.schedulerKickHint}>
+                Loading campaign state (times out in ~5s if the API does not
+                respond).
+              </p>
+            </>
+          ) : schedulerKickProgress.total > 0 ? (
             <>
               <div className={styles.schedulerKickLabel}>
                 Sending… {schedulerKickProgress.done} /{" "}
@@ -2100,7 +2183,7 @@ export function ServersView() {
             disabled={
               syncing || fullReloading || !activeBotId || schedulerKickBusy
             }
-            title="Runs posting now for your account (waits until finished): skips campaign cooldown but still obeys Discord channel slowmode and per-bot spacing."
+            title="Starts the ad scheduler on the server right away (response returns immediately; watch Sending progress below). Skips campaign cooldown for your account; Discord slowmode and per-bot spacing still apply."
           >
             <Send size={16} strokeWidth={2} aria-hidden />
             {schedulerKickBusy ? "Sending…" : "Send ads now"}
