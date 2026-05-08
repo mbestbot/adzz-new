@@ -109,6 +109,54 @@
   }
 }
 
+.schedulerKickWrap {
+  margin-bottom: 1rem;
+  max-width: 36rem;
+}
+
+.schedulerKickLabel {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--dash-text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.schedulerKickTrack {
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.schedulerKickFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--dash-accent, #a78bfa),
+    var(--dash-positive, #22c55e)
+  );
+  transition: width 0.28s ease-out;
+}
+
+.schedulerKickHint {
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--dash-muted);
+  max-width: 34rem;
+}
+
+.schedulerKickEmpty {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--dash-amber, #fbbf24);
+  max-width: 36rem;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

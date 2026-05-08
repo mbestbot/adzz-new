@@ -160,6 +160,65 @@ function formatCooldownSeconds(totalSec: number) {
   return `${d} d`;
 }
 
+/** Returned by fetchAdCampaign for UI + Send ads now progress. */
+type AdCampaignSnapshot = {
+  enabled: boolean;
+  runningChannelIds: Set<string>;
+  pausedChannelIds: Set<string>;
+  listedChannelIds: Set<string>;
+  channelErrors: Record<string, string>;
+  intervalSeconds: number | null;
+  channelIntervalSeconds: Record<string, number>;
+  channelLastSentAt: Record<string, number | null>;
+  channelLastSendErrorAt: Record<string, number | null>;
+  channelDiscordSlowmodeSec: Record<string, number | null>;
+  guildAdsSent: Record<string, number>;
+  channelAdsSent: Record<string, number>;
+};
+
+function snapshotChannelActivityMax(
+  ac: AdCampaignSnapshot
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const id of ac.listedChannelIds) {
+    const sent = ac.channelLastSentAt[id];
+    const err = ac.channelLastSendErrorAt[id];
+    out[id] = Math.max(
+      sent != null && Number.isFinite(sent) ? sent : 0,
+      err != null && Number.isFinite(err) ? err : 0
+    );
+  }
+  return out;
+}
+
+function countNonPausedListed(ac: AdCampaignSnapshot): number {
+  let n = 0;
+  for (const id of ac.listedChannelIds) {
+    if (!ac.pausedChannelIds.has(id)) n++;
+  }
+  return n;
+}
+
+/** Count channels whose latest activity timestamp increased since the snapshot (send or failed attempt). */
+function countKickCompletedSinceSnapshot(
+  ac: AdCampaignSnapshot,
+  beforeMax: Record<string, number>
+): number {
+  let done = 0;
+  for (const id of ac.listedChannelIds) {
+    if (ac.pausedChannelIds.has(id)) continue;
+    const prev = beforeMax[id] ?? 0;
+    const sent = ac.channelLastSentAt[id];
+    const err = ac.channelLastSendErrorAt[id];
+    const now = Math.max(
+      sent != null && Number.isFinite(sent) ? sent : 0,
+      err != null && Number.isFinite(err) ? err : 0
+    );
+    if (now > prev) done++;
+  }
+  return done;
+}
+
 function formatRelativeLastRun(atMs: number, nowMs: number): string {
   const delta = Math.max(0, nowMs - atMs);
   const sec = Math.floor(delta / 1000);
@@ -454,6 +513,11 @@ export function ServersView() {
     null
   );
   const [schedulerKickBusy, setSchedulerKickBusy] = useState(false);
+  const [schedulerKickProgress, setSchedulerKickProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  const kickActivityBeforeRef = useRef<Record<string, number>>({});
   /** Why Basic campaigns might not run (burst / Ad pool mode) — mirrors backend userSkipsStandardCampaigns. */
   const [messagesRoutingHint, setMessagesRoutingHint] = useState<string | null>(
     null
@@ -467,20 +531,7 @@ export function ServersView() {
     const id = window.setInterval(() => setWallNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, []);
-  const [adCampaign, setAdCampaign] = useState<{
-    enabled: boolean;
-    runningChannelIds: Set<string>;
-    pausedChannelIds: Set<string>;
-    listedChannelIds: Set<string>;
-    channelErrors: Record<string, string>;
-    intervalSeconds: number | null;
-    channelIntervalSeconds: Record<string, number>;
-    channelLastSentAt: Record<string, number | null>;
-    channelLastSendErrorAt: Record<string, number | null>;
-    channelDiscordSlowmodeSec: Record<string, number | null>;
-    guildAdsSent: Record<string, number>;
-    channelAdsSent: Record<string, number>;
-  }>({
+  const [adCampaign, setAdCampaign] = useState<AdCampaignSnapshot>({
     enabled: false,
     runningChannelIds: new Set(),
     pausedChannelIds: new Set(),
@@ -508,7 +559,7 @@ export function ServersView() {
     linkedByGuildRef.current = linkedByGuild;
   }, [linkedByGuild]);
 
-  const fetchAdCampaign = useCallback(async () => {
+  const fetchAdCampaign = useCallback(async (): Promise<AdCampaignSnapshot | null> => {
     if (!activeBotId) {
       setAdCampaign({
         enabled: false,
@@ -526,7 +577,7 @@ export function ServersView() {
       });
       slowmodeProbeAttemptedRef.current = new Set();
       setMessagesRoutingHint(null);
-      return;
+      return null;
     }
     const [res, msgRes] = await Promise.all([
       apiFetch("/api/ad-campaign"),
@@ -537,7 +588,7 @@ export function ServersView() {
         console.warn("[ServersView] /api/ad-campaign failed", res.status);
       }
       setMessagesRoutingHint(null);
-      return;
+      return null;
     }
     let msgState: MessagesStateForServers | null = null;
     if (msgRes.ok) {
@@ -746,7 +797,7 @@ export function ServersView() {
     }
     setMessagesRoutingHint(routingHint);
 
-    setAdCampaign({
+    const next: AdCampaignSnapshot = {
       enabled: anyEnabled,
       runningChannelIds: running,
       pausedChannelIds: paused,
@@ -759,7 +810,9 @@ export function ServersView() {
       channelDiscordSlowmodeSec,
       guildAdsSent,
       channelAdsSent,
-    });
+    };
+    setAdCampaign(next);
+    return next;
   }, [activeBotId]);
 
   const loadGuilds = useCallback(async () => {
@@ -1422,6 +1475,33 @@ export function ServersView() {
   const kickAdScheduler = useCallback(async () => {
     if (!activeBotId) return;
     setSchedulerKickBusy(true);
+    const preSnap = await fetchAdCampaign();
+    if (!preSnap) {
+      setSchedulerKickBusy(false);
+      window.alert("Could not load campaign state. Try refreshing the page.");
+      return;
+    }
+
+    kickActivityBeforeRef.current = snapshotChannelActivityMax(preSnap);
+    const kickTotal = countNonPausedListed(preSnap);
+    setSchedulerKickProgress({ done: 0, total: kickTotal });
+
+    const pollMs = 400;
+    const pollTimer = window.setInterval(() => {
+      void (async () => {
+        const snap = await fetchAdCampaign();
+        if (!snap) return;
+        const done = countKickCompletedSinceSnapshot(
+          snap,
+          kickActivityBeforeRef.current
+        );
+        setSchedulerKickProgress({
+          done,
+          total: kickTotal,
+        });
+      })();
+    }, pollMs);
+
     try {
       const schedRes = await apiFetch(
         "/api/ad-campaign/run-scheduler",
@@ -1471,7 +1551,7 @@ export function ServersView() {
 
       const base =
         data.immediate === true
-          ? "Immediate send pass finished — check Discord channels or Logs if nothing appeared (permissions / slowmode)."
+          ? "Immediate send pass finished — check Discord channels or Logs if counts stayed below total (burst pool mode, permissions, or slowmode)."
           : "Scheduler triggered — ads should start within a few seconds if your campaign is ready.";
       setToolbarFlash(
         warnings.length ? `${warnings.join(" ")} ${base}` : base
@@ -1484,7 +1564,20 @@ export function ServersView() {
       window.setTimeout(() => void fetchAdCampaign(), 2500);
       window.setTimeout(() => void fetchAdCampaign(), 6000);
     } finally {
+      window.clearInterval(pollTimer);
+      const finalSnap = await fetchAdCampaign();
+      if (finalSnap) {
+        const done = countKickCompletedSinceSnapshot(
+          finalSnap,
+          kickActivityBeforeRef.current
+        );
+        setSchedulerKickProgress({
+          done,
+          total: kickTotal,
+        });
+      }
       setSchedulerKickBusy(false);
+      window.setTimeout(() => setSchedulerKickProgress(null), 4200);
     }
   }, [activeBotId, fetchAdCampaign]);
 
@@ -1809,6 +1902,55 @@ export function ServersView() {
         >
           {toolbarFlash}
         </p>
+      ) : null}
+
+      {schedulerKickProgress != null ? (
+        <div
+          className={styles.schedulerKickWrap}
+          role="status"
+          aria-live="polite"
+        >
+          {schedulerKickProgress.total > 0 ? (
+            <>
+              <div className={styles.schedulerKickLabel}>
+                Sending… {schedulerKickProgress.done} /{" "}
+                {schedulerKickProgress.total}
+              </div>
+              <div
+                className={styles.schedulerKickTrack}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={schedulerKickProgress.total}
+                aria-valuenow={schedulerKickProgress.done}
+              >
+                <div
+                  className={styles.schedulerKickFill}
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round(
+                        (schedulerKickProgress.done /
+                          Math.max(1, schedulerKickProgress.total)) *
+                          100
+                      )
+                    )}%`,
+                  }}
+                />
+              </div>
+              <p className={styles.schedulerKickHint}>
+                Updates when each channel logs a send or error. If this stays
+                at 0, check the amber hint above (Ad pool / burst) or Discord
+                permissions.
+              </p>
+            </>
+          ) : (
+            <p className={styles.schedulerKickEmpty}>
+              No posting targets for this bot — open{" "}
+              <strong>Messages</strong> and add channels to your campaign or ad
+              pool.
+            </p>
+          )}
+        </div>
       ) : null}
 
       <div className={styles.metrics}>
