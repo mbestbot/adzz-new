@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Search,
+  Send,
   Wrench,
   Wand2,
 } from "lucide-react";
@@ -447,6 +448,7 @@ export function ServersView() {
   const [checkingChannelId, setCheckingChannelId] = useState<string | null>(
     null
   );
+  const [schedulerKickBusy, setSchedulerKickBusy] = useState(false);
   const checkAbortByChannelRef = useRef<Map<string, AbortController>>(
     new Map()
   );
@@ -1352,6 +1354,30 @@ export function ServersView() {
     [activeBotId, fetchAdCampaign]
   );
 
+  const kickAdScheduler = useCallback(async () => {
+    if (!activeBotId) return;
+    setSchedulerKickBusy(true);
+    try {
+      const res = await apiFetch("/api/ad-campaign/run-scheduler", {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        window.alert(data.error ?? `Could not run scheduler (${res.status})`);
+        return;
+      }
+      setToolbarFlash(
+        "Scheduler triggered — ads should start within a few seconds if your campaign is ready."
+      );
+      window.setTimeout(() => setToolbarFlash(null), 6000);
+      await fetchAdCampaign();
+      window.setTimeout(() => void fetchAdCampaign(), 2500);
+      window.setTimeout(() => void fetchAdCampaign(), 6000);
+    } finally {
+      setSchedulerKickBusy(false);
+    }
+  }, [activeBotId, fetchAdCampaign]);
+
   useEffect(() => {
     if (!fetchBanner) {
       syncBarStopRef.current = true;
@@ -1798,6 +1824,18 @@ export function ServersView() {
           >
             <RefreshCw size={16} strokeWidth={2} />
             {syncing ? "Syncing Discord…" : "Refresh from Discord"}
+          </button>
+          <button
+            type="button"
+            className={styles.schedulerKickBtn}
+            onClick={() => void kickAdScheduler()}
+            disabled={
+              syncing || fullReloading || !activeBotId || schedulerKickBusy
+            }
+            title="Runs the ad scheduler immediately instead of waiting for the next automatic tick (~5s). Use if posting hasn’t started yet."
+          >
+            <Send size={16} strokeWidth={2} aria-hidden />
+            {schedulerKickBusy ? "Starting…" : "Send ads now"}
           </button>
           <button
             type="button"
