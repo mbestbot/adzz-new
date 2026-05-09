@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-const SKIP_HEADERS = new Set([
+const SKIP_REQ_HEADERS = new Set([
   "connection",
   "keep-alive",
   "transfer-encoding",
   "host",
   "content-length",
+  /** Undici decompresses gzip but may leave Content-Encoding; asking upstream for gzip then strips on response. */
+  "accept-encoding",
+]);
+
+/** Strip after fetch: Node fetch decompresses body but upstream headers can still say gzip. */
+const SKIP_RES_HEADERS = new Set([
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
 ]);
 
 function upstreamBase(): string {
@@ -27,7 +37,7 @@ async function proxy(req: NextRequest, segments: string[]) {
 
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (!SKIP_HEADERS.has(key.toLowerCase())) {
+    if (!SKIP_REQ_HEADERS.has(key.toLowerCase())) {
       headers.set(key, value);
     }
   });
@@ -55,7 +65,13 @@ async function proxy(req: NextRequest, segments: string[]) {
     );
   }
 
-  const out = new Headers(res.headers);
+  const out = new Headers();
+  res.headers.forEach((value, key) => {
+    if (!SKIP_RES_HEADERS.has(key.toLowerCase())) {
+      out.set(key, value);
+    }
+  });
+
   return new NextResponse(res.body, {
     status: res.status,
     statusText: res.statusText,
