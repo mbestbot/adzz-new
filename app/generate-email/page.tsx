@@ -2,10 +2,8 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
+import { API_BASE } from "@/lib/api";
 import "./email.css";
-
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
 export default function GenerateEmailPage() {
   const [email, setEmail] = useState<string | null>(null);
