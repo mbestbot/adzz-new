@@ -11,12 +11,15 @@ const upstream = (
 
 const nextConfig: NextConfig = {
   async rewrites() {
-    return [
-      {
-        source: "/adzz-api-proxy/:path*",
-        destination: `${upstream}/:path*`,
-      },
-    ];
+    /** Must run before App Router file matching or `/adzz-api-proxy/*` becomes 404 on Vercel. */
+    return {
+      beforeFiles: [
+        {
+          source: "/adzz-api-proxy/:path*",
+          destination: `${upstream}/:path*`,
+        },
+      ],
+    };
   },
 };
 
