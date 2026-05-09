@@ -9,11 +9,9 @@ const SKIP_REQ_HEADERS = new Set([
   "transfer-encoding",
   "host",
   "content-length",
-  /** Undici decompresses gzip but may leave Content-Encoding; asking upstream for gzip then strips on response. */
   "accept-encoding",
 ]);
 
-/** Strip after fetch: Node fetch decompresses body but upstream headers can still say gzip. */
 const SKIP_RES_HEADERS = new Set([
   "content-encoding",
   "content-length",
@@ -71,6 +69,7 @@ async function proxy(req: NextRequest, segments: string[]) {
       out.set(key, value);
     }
   });
+  out.set("x-adzz-proxy-target", url);
 
   return new NextResponse(res.body, {
     status: res.status,
@@ -79,58 +78,39 @@ async function proxy(req: NextRequest, segments: string[]) {
   });
 }
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+type Ctx = { params: Promise<{ path: string[] }> };
+
+export async function GET(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function POST(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function POST(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function PUT(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function PUT(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function PATCH(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function PATCH(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function DELETE(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function DELETE(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function OPTIONS(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function OPTIONS(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
 
-export async function HEAD(
-  req: NextRequest,
-  ctx: { params: Promise<{ path?: string[] }> }
-) {
-  const { path = [] } = await ctx.params;
-  return proxy(req, path);
+export async function HEAD(req: NextRequest, ctx: Ctx) {
+  const { path } = await ctx.params;
+  return proxy(req, path ?? []);
 }
