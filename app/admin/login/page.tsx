@@ -27,6 +27,7 @@ export default function AdminLoginPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim(), password }),
+          credentials: "include",
         });
         const data = (await res.json().catch(() => ({}))) as {
           error?: string;

@@ -1,5 +1,54 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
+/**
+ * Browser → Adzz API base URL.
+ *
+ * - **Local:** set `NEXT_PUBLIC_API_URL=http://localhost:3001` in `.env.local` (or omit for default).
+ * - **Production:** set in `.env.production` (e.g. `https://api.pearlgrow.com`). If unset at build time,
+ *   production builds default to `https://api.pearlgrow.com`.
+ *
+ * All API calls should use `API_BASE` / `apiFetch` / `authPublicPost` — do not hardcode hosts.
+ */
+const PRODUCTION_DEFAULT_API = "https://api.pearlgrow.com";
+const DEVELOPMENT_DEFAULT_API = "http://localhost:3001";
+
+function stripTrailingSlashes(s: string): string {
+  return s.replace(/\/+$/, "");
+}
+
+function isLocalHostname(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
+/** Non-local HTTP URLs become HTTPS in production builds (mixed content / policy). */
+function enforceHttpsInProduction(url: string): string {
+  if (process.env.NODE_ENV !== "production") return url;
+  try {
+    const u = new URL(url);
+    if (u.protocol === "http:" && !isLocalHostname(u.hostname)) {
+      u.protocol = "https:";
+      return stripTrailingSlashes(u.origin);
+    }
+  } catch {
+    /* keep raw */
+  }
+  return url;
+}
+
+function resolveApiBase(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (raw) {
+    return enforceHttpsInProduction(stripTrailingSlashes(raw));
+  }
+  if (process.env.NODE_ENV === "production") {
+    return PRODUCTION_DEFAULT_API;
+  }
+  return DEVELOPMENT_DEFAULT_API;
+}
+
+export const API_BASE = resolveApiBase();
 
 const TOKEN_KEY = "adzz_token";
 
@@ -42,7 +91,12 @@ export type ApiFetchOptions = {
 };
 
 function isLocalApiBase(): boolean {
-  return /localhost|127\.0\.0\.1/i.test(API_BASE);
+  try {
+    const u = new URL(API_BASE);
+    return isLocalHostname(u.hostname);
+  } catch {
+    return /localhost|127\.0\.0\.1/i.test(API_BASE);
+  }
 }
 
 function networkFailureHint(path: string, lastErr: unknown): string {
@@ -121,7 +175,7 @@ export async function apiFetch(
   if (token) headers.set("Authorization", `Bearer ${token}`);
   const url = `${API_BASE}${path}`;
   const maxAttempts =
-    options?.timeoutMs != null && options.timeoutMs > 0
+    options?.timeoutMs != null && options?.timeoutMs > 0
       ? 1
       : networkRetryAttemptsForInit(init);
   let lastErr: unknown;

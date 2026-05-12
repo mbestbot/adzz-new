@@ -1804,7 +1804,7 @@ export function ServersView() {
       if (!sync.ok) {
         window.alert(
           sync.error ??
-            "Could not refresh from Discord. If you see 502 in the network tab, nginx may be timing out before the API finishes — use at least proxy_read_timeout 180s on /adzz-api/ (see deploy/nginx-myadbot-full.conf) and confirm the Adzz API is running."
+            "Could not refresh from Discord. If you see 502 in the network tab, nginx may be timing out before the API finishes — use at least proxy_read_timeout 180s on your API location block (see deploy/nginx-api.pearlgrow.com.conf) and confirm the Adzz API is running."
         );
         return;
       }
@@ -1846,7 +1846,7 @@ export function ServersView() {
       if (!sync.ok) {
         window.alert(
           sync.error ??
-            "Could not sync from Discord. If you see 502 in the network tab, check nginx proxy_read_timeout on /adzz-api/ and that the API is running."
+            "Could not sync from Discord. If you see 502 in the network tab, check nginx proxy_read_timeout on your API host and that Node matches nginx upstream (see deploy/nginx-api.pearlgrow.com.conf)."
         );
         return;
       }

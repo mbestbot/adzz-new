@@ -24,6 +24,7 @@ function adminAuthHeaders(): HeadersInit {
 export async function adminGetJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { ...adminAuthHeaders() },
+    credentials: "include",
   });
   return parseAdminResponse<T>(res);
 }
@@ -33,6 +34,7 @@ export async function adminPostJson<T>(path: string, body: unknown): Promise<T> 
     method: "POST",
     headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify(body ?? {}),
+    credentials: "include",
   });
   return parseAdminResponse<T>(res);
 }
@@ -42,6 +44,7 @@ export async function adminPatchJson<T>(path: string, body: unknown): Promise<T>
     method: "PATCH",
     headers: { "Content-Type": "application/json", ...adminAuthHeaders() },
     body: JSON.stringify(body ?? {}),
+    credentials: "include",
   });
   return parseAdminResponse<T>(res);
 }
@@ -50,6 +53,7 @@ export async function adminDeleteJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
     headers: { ...adminAuthHeaders() },
+    credentials: "include",
   });
   return parseAdminResponse<T>(res);
 }
