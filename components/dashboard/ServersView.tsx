@@ -43,7 +43,7 @@ function startGuildListPolling(
   return () => window.clearInterval(id);
 }
 
-/** Minimal slice of GET /api/messages-state for Servers channel badges. */
+/** Minimal slice of messages prefs (matches GET /api/messages-state and bundle `messagesState`). */
 type MessagesStateForServers = {
   uiMode?: string;
   burst?: {
@@ -568,6 +568,8 @@ export function ServersView() {
   /** After probe failures (e.g. gateway 502), pause probes to avoid hammering the API. */
   const channelProbeCooldownUntilRef = useRef(0);
   const [probeCooldownEpoch, setProbeCooldownEpoch] = useState(0);
+  /** After failed campaign poll, pause rapid retries (reduces load when API or disk is slow). */
+  const adCampaignPollBackoffUntilRef = useRef(0);
   const adCampaignRef = useRef(adCampaign);
   const linkedByGuildRef = useRef(linkedByGuild);
 
@@ -601,26 +603,21 @@ export function ServersView() {
       setMessagesRoutingHint(null);
       return null;
     }
-    const apiOpts =
+    const resolvedTimeoutMs =
       fetchOpts?.timeoutMs != null && fetchOpts.timeoutMs > 0
-        ? { timeoutMs: fetchOpts.timeoutMs }
-        : undefined;
-    const [res, msgRes] = await Promise.all([
-      apiFetch("/api/ad-campaign", {}, apiOpts),
-      apiFetch("/api/messages-state", {}, apiOpts),
-    ]);
+        ? fetchOpts.timeoutMs
+        : 180_000;
+    const apiOpts = { timeoutMs: resolvedTimeoutMs, quietLog: true };
+    const res = await apiFetch("/api/ad-campaign-ui-bundle", {}, apiOpts);
     if (!res.ok) {
       if (process.env.NODE_ENV === "development") {
-        console.warn("[ServersView] /api/ad-campaign failed", res.status);
+        console.warn("[ServersView] /api/ad-campaign-ui-bundle failed", res.status);
       }
       setMessagesRoutingHint(null);
+      adCampaignPollBackoffUntilRef.current = Date.now() + 12_000;
       return null;
     }
-    let msgState: MessagesStateForServers | null = null;
-    if (msgRes.ok) {
-      msgState = (await msgRes.json()) as MessagesStateForServers;
-    }
-    const data = (await res.json()) as {
+    const bundle = (await res.json()) as {
       campaigns?: {
         enabled?: boolean;
         message?: string;
@@ -637,7 +634,11 @@ export function ServersView() {
           adsSentTotal?: number;
         }[];
       }[];
+      messagesState?: MessagesStateForServers;
     };
+    const data = { campaigns: bundle.campaigns ?? [] };
+    let msgState: MessagesStateForServers | null =
+      bundle.messagesState ?? null;
     const campaigns = data.campaigns ?? [];
     /** Pool config persists while uiMode is Basic; stats stay on these targets. */
     const adPoolState = msgState?.adPool ?? null;
@@ -837,6 +838,7 @@ export function ServersView() {
       guildAdsSent,
       channelAdsSent,
     };
+    adCampaignPollBackoffUntilRef.current = 0;
     setAdCampaign(next);
     return next;
     },
@@ -934,6 +936,7 @@ export function ServersView() {
         document.visibilityState !== "visible"
       )
         return;
+      if (Date.now() < adCampaignPollBackoffUntilRef.current) return;
       void fetchAdCampaign();
     }, 3000);
     return () => window.clearInterval(id);
@@ -1480,11 +1483,15 @@ export function ServersView() {
       checkAbortByChannelRef.current.set(channelId, ac);
       setCheckingChannelId(channelId);
       try {
-        const res = await apiFetch("/api/ad-campaign/channel/check-post", {
-          method: "POST",
-          body: JSON.stringify({ botId: activeBotId, channelId }),
-          signal: ac.signal,
-        });
+        const res = await apiFetch(
+          "/api/ad-campaign/channel/check-post",
+          {
+            method: "POST",
+            body: JSON.stringify({ botId: activeBotId, channelId }),
+            signal: ac.signal,
+          },
+          { timeoutMs: 120_000, quietLog: true }
+        );
         const data = (await res.json().catch(() => ({}))) as {
           ok?: boolean;
           kind?: string;
@@ -1557,8 +1564,8 @@ export function ServersView() {
   );
 
   const kickAdScheduler = useCallback(async () => {
-    const KICK_SNAPSHOT_TIMEOUT_MS = 5000;
-    const KICK_POLL_TIMEOUT_MS = 8000;
+    const KICK_SNAPSHOT_TIMEOUT_MS = 30_000;
+    const KICK_POLL_TIMEOUT_MS = 45_000;
 
     if (!activeBotId) return;
     setSchedulerKickBusy(true);
@@ -1605,7 +1612,7 @@ export function ServersView() {
       const msgRes = await apiFetch(
         "/api/messages-state",
         {},
-        { timeoutMs: 8000 }
+        { timeoutMs: 30_000 }
       );
       const warnings: string[] = [];
       if (msgRes.ok) {
