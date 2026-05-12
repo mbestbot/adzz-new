@@ -810,16 +810,6 @@ export function ServersView() {
           "Burst campaign is running — basic campaigns wait until it finishes or you stop it on Messages."
         );
       }
-      const pool = msgState.adPool;
-      const poolMsgs =
-        Array.isArray(pool?.messages) &&
-        pool.messages.some((m) => String(m ?? "").trim().length > 0);
-      const poolTg = (pool?.targets?.length ?? 0) > 0;
-      if (msgState.uiMode === "adpool" && poolMsgs && poolTg) {
-        hints.push(
-          'Messages is on "Ad pool" — only pool copy is sent; Basic campaign copy is skipped. Switch Messages to Basic or clear the pool.'
-        );
-      }
       routingHint = hints.length ? hints.join(" ") : null;
     }
     setMessagesRoutingHint(routingHint);
@@ -1629,18 +1619,6 @@ export function ServersView() {
             "Burst campaign is still running — Basic campaigns wait until burst finishes or you stop it on Messages."
           );
         }
-        if (ms.uiMode === "adpool") {
-          const pool = ms.adPool;
-          const poolMsgs =
-            Array.isArray(pool?.messages) &&
-            pool.messages.some((m) => String(m ?? "").trim().length > 0);
-          const poolTg = (pool?.targets?.length ?? 0) > 0;
-          if (poolMsgs && poolTg) {
-            warnings.push(
-              'Messages is on "Ad pool" — Basic campaigns do not run. Switch the Messages tab to Basic or clear the pool.'
-            );
-          }
-        }
       }
 
       const base =
@@ -1985,14 +1963,6 @@ export function ServersView() {
         </p>
         <h1 className={styles.title}>Server &amp; channel control</h1>
       </header>
-
-      <p className={styles.pageLead}>
-        Newly linked channels are queued for a post within a few seconds (then your
-        interval applies). Save ad copy and targets on{" "}
-        <strong>Messages</strong>. If Discord shows no sends, open each server’s
-        channel settings and allow the bot to <strong>View Channel</strong> and{" "}
-        <strong>Send Messages</strong> (category overrides count).
-      </p>
 
       {messagesRoutingHint ? (
         <p
