@@ -24,6 +24,10 @@ export default function InvoicePage() {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [payerEmail, setPayerEmail] = useState("");
+  const [payerBusinessName, setPayerBusinessName] = useState("");
+  const [payerTaxId, setPayerTaxId] = useState("");
+  const [payerTaxIdType, setPayerTaxIdType] = useState<string>("us_ein");
+  const [payerTaxIdTypeCustom, setPayerTaxIdTypeCustom] = useState("");
   const [result, setResult] = useState<CreateInvoiceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,12 @@ export default function InvoicePage() {
           amount: amount.trim(),
           description: description.trim() || undefined,
           payerEmail: payerEmail.trim() || undefined,
+          payerBusinessName: payerBusinessName.trim() || undefined,
+          payerTaxId: payerTaxId.trim() || undefined,
+          payerTaxIdType:
+            payerTaxIdType === "custom"
+              ? payerTaxIdTypeCustom.trim() || "us_ein"
+              : payerTaxIdType,
         }),
       });
       const data = (await res.json()) as CreateInvoiceResponse;
@@ -58,7 +68,15 @@ export default function InvoicePage() {
     } finally {
       setLoading(false);
     }
-  }, [amount, description, payerEmail]);
+  }, [
+    amount,
+    description,
+    payerEmail,
+    payerBusinessName,
+    payerTaxId,
+    payerTaxIdType,
+    payerTaxIdTypeCustom,
+  ]);
 
   const copyLink = useCallback(async () => {
     const url = result?.hostedInvoiceUrl;
@@ -129,6 +147,74 @@ export default function InvoicePage() {
               placeholder="Prefills Stripe’s receipt field when present"
               value={payerEmail}
               onChange={(e) => setPayerEmail(e.target.value)}
+            />
+          </div>
+          <div className="invoice-tool-row">
+            <label htmlFor="inv-biz">Payer business name (optional)</label>
+            <input
+              id="inv-biz"
+              className="invoice-tool-input"
+              type="text"
+              autoComplete="organization"
+              placeholder="Legal or billing name on the invoice"
+              value={payerBusinessName}
+              onChange={(e) => setPayerBusinessName(e.target.value)}
+              maxLength={150}
+            />
+          </div>
+          <div className="invoice-tool-row">
+            <label htmlFor="inv-tax-type">Payer tax ID type (optional)</label>
+            <select
+              id="inv-tax-type"
+              className="invoice-tool-input"
+              value={payerTaxIdType}
+              onChange={(e) => setPayerTaxIdType(e.target.value)}
+              aria-describedby="inv-tax-hint"
+            >
+              <option value="us_ein">US — EIN (us_ein)</option>
+              <option value="eu_vat">EU — VAT number (eu_vat)</option>
+              <option value="gb_vat">UK — VAT (gb_vat)</option>
+              <option value="ca_bn">Canada — Business Number (ca_bn)</option>
+              <option value="au_abn">Australia — ABN (au_abn)</option>
+              <option value="mx_rfc">Mexico — RFC (mx_rfc)</option>
+              <option value="custom">Other (Stripe type slug)…</option>
+            </select>
+            <p id="inv-tax-hint" className="invoice-tool-hint">
+              Only used if you enter a tax ID below. Must match Stripe’s{" "}
+              <a
+                href="https://docs.stripe.com/api/customers/create#create_customer-tax_id_data-type"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                customer tax ID types
+              </a>
+              .
+            </p>
+            {payerTaxIdType === "custom" ? (
+              <input
+                className="invoice-tool-input"
+                style={{ marginTop: "0.5rem" }}
+                type="text"
+                placeholder="e.g. de_stn, jp_cn"
+                value={payerTaxIdTypeCustom}
+                onChange={(e) => setPayerTaxIdTypeCustom(e.target.value)}
+                maxLength={32}
+                autoComplete="off"
+              />
+            ) : null}
+          </div>
+          <div className="invoice-tool-row">
+            <label htmlFor="inv-tax-id">Payer tax ID (optional)</label>
+            <input
+              id="inv-tax-id"
+              className="invoice-tool-input"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              placeholder="Digits / letters as issued (spaces stripped when sent)"
+              value={payerTaxId}
+              onChange={(e) => setPayerTaxId(e.target.value)}
+              maxLength={40}
             />
           </div>
           <div className="invoice-tool-actions">
