@@ -172,7 +172,10 @@ export default function InvoicePage() {
               aria-describedby="inv-tax-hint"
             >
               <option value="us_ein">US — EIN (us_ein)</option>
-              <option value="eu_vat">EU — VAT number (eu_vat)</option>
+              <option value="eu_vat">
+                EU — VAT (eu_vat), include country code (e.g. RO…, DE…)
+              </option>
+              <option value="ro_tin">Romania — TIN (ro_tin)</option>
               <option value="gb_vat">UK — VAT (gb_vat)</option>
               <option value="ca_bn">Canada — Business Number (ca_bn)</option>
               <option value="au_abn">Australia — ABN (au_abn)</option>
@@ -180,7 +183,10 @@ export default function InvoicePage() {
               <option value="custom">Other (Stripe type slug)…</option>
             </select>
             <p id="inv-tax-hint" className="invoice-tool-hint">
-              Only used if you enter a tax ID below. Must match Stripe’s{" "}
+              Only used if you enter a tax ID below. For <strong>EU VAT</strong>, type
+              the full ID with the country prefix (e.g. <strong>RO53679159</strong> for
+              Romania) — digits alone can show as the wrong country (e.g. HU VAT). See
+              Stripe’s{" "}
               <a
                 href="https://docs.stripe.com/api/customers/create#create_customer-tax_id_data-type"
                 target="_blank"
@@ -211,7 +217,13 @@ export default function InvoicePage() {
               type="text"
               inputMode="text"
               autoComplete="off"
-              placeholder="Digits / letters as issued (spaces stripped when sent)"
+              placeholder={
+                payerTaxIdType === "eu_vat"
+                  ? "e.g. RO53679159 (RO + number for Romania)"
+                  : payerTaxIdType === "ro_tin"
+                    ? "Romania TIN as issued (ro_tin)"
+                    : "Digits / letters as issued (spaces stripped when sent)"
+              }
               value={payerTaxId}
               onChange={(e) => setPayerTaxId(e.target.value)}
               maxLength={40}
