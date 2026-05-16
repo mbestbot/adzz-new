@@ -1,0 +1,90 @@
+.invoice-tool-row {
+  margin-bottom: 1.1rem;
+}
+
+.invoice-tool-row label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--dash-muted);
+  margin-bottom: 0.4rem;
+}
+
+.invoice-tool-input,
+.invoice-tool-textarea {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--dash-radius-sm);
+  border: 1px solid var(--dash-border-strong);
+  background: var(--dash-surface-2);
+  color: var(--dash-text);
+}
+
+.invoice-tool-textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+.invoice-tool-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--dash-muted-2);
+  line-height: 1.4;
+}
+
+.invoice-tool-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
+.invoice-tool-btn-secondary {
+  background: var(--dash-surface-3) !important;
+  color: var(--dash-text-secondary) !important;
+  box-shadow: var(--dash-shadow-sm) !important;
+  border: 1px solid var(--dash-border-strong) !important;
+}
+
+.invoice-tool-link-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.invoice-tool-link-row a {
+  color: var(--dash-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.invoice-tool-link-row a:hover {
+  text-decoration: underline;
+}
+
+.invoice-tool-meta {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--dash-muted);
+  line-height: 1.5;
+}
+
+.invoice-tool-login {
+  padding: 1rem 1.15rem;
+  border-radius: var(--dash-radius);
+  background: var(--dash-surface-2);
+  border: 1px solid var(--dash-border-strong);
+  margin-bottom: 1.5rem;
+}
+
+.invoice-tool-login a {
+  color: var(--dash-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.invoice-tool-login a:hover {
+  text-decoration: underline;
+}
